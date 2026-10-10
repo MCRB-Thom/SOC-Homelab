@@ -1,0 +1,21 @@
+# 2026-10-08 — VM Wazuh (109) — diagnostic : wazuh-manager "failed" après démarrage de la VM
+# systemctl status wazuh-manager --no-pager -l | tail -20; tail -40 /var/ossec/logs/ossec.log; journalctl -k -b | grep -i -E 'oom|killed process'
+
+oct. 08 20:38:33 WAZUH systemd[1]: wazuh-manager.service: Failed with result 'timeout'.
+oct. 08 20:38:33 WAZUH systemd[1]: wazuh-manager.service: Unit process 822 (python3) remains running after unit stopped.
+[... idem pour les processus wazuh_apid.py 833, 834, 837, 840, wazuh-authd 879 ...]
+oct. 08 20:38:33 WAZUH systemd[1]: Failed to start wazuh-manager.service - Wazuh manager.
+
+# ossec.log (extrait) : dernier arrêt propre le 2026/08/22, redémarrage le 2026/10/08
+2026/08/22 23:30:41 wazuh-authd: INFO: Exiting...
+2026/10/08 20:38:27 wazuh-modulesd:router: INFO: Loaded router module.
+2026/10/08 20:38:27 wazuh-modulesd:content_manager: INFO: Loaded content_manager module.
+2026/10/08 20:38:33 wazuh-authd: INFO: Started (pid: 879).
+2026/10/08 20:38:33 wazuh-authd: INFO: Accepting connections on port 1515. No password required.
+
+# journalctl -k : aucune trace d'OOM killer.
+
+# Diagnostic : pas un manque de RAM. Le démarrage du manager dépasse le délai systemd
+# au boot (indexer + dashboard + manager démarrent en même temps sur 2 vCPU).
+# systemd marque l'unité en échec mais laisse des processus orphelins.
+# Correctif : arrêt propre + délai de démarrage allongé (drop-in TimeoutStartSec=300).

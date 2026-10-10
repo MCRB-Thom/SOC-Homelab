@@ -1,0 +1,23 @@
+﻿# 2026-10-10 — VM Wazuh (109) — wazuh-indexer "failed" après arrêt/démarrage à froid de la VM
+# fstrim -av; systemctl enable --now fstrim.timer; systemctl is-active wazuh-indexer wazuh-manager wazuh-dashboard
+/ : 19,6 GiB (21094916096 octets) réduits sur /dev/sda1
+failed      <- wazuh-indexer
+active      <- wazuh-manager
+active      <- wazuh-dashboard
+
+# systemctl status wazuh-indexer --no-pager -l | tail -15; journalctl -u wazuh-indexer -b --no-pager | tail -20; free -h
+     Active: failed (Result: timeout) since Sat 2026-10-10 14:24:58 CEST; 3min 25s ago
+   Main PID: 529 (code=exited, status=143)
+oct. 10 14:21:58 WAZUH systemd[1]: Starting wazuh-indexer.service - wazuh-indexer...
+oct. 10 14:22:29 WAZUH systemd-entrypoint[529]: WARNING: Using incubator modules: jdk.incubator.vector
+[... avertissements Java sans gravité (setSecurityManager, COMPAT locale) ...]
+oct. 10 14:24:58 WAZUH systemd[1]: wazuh-indexer.service: start operation timed out. Terminating.
+oct. 10 14:24:58 WAZUH systemd[1]: wazuh-indexer.service: Failed with result 'timeout'.
+               total       utilisé      libre     partagé tamp/cache   disponible
+Mem:           4,8Gi       1,5Gi       1,3Gi       748Ki       2,3Gi       3,3Gi
+Échange:       974Mi          0B       974Mi
+
+# Diagnostic : même cause que le manager (s01-06) : délai de démarrage dépassé (180 s), pas la RAM
+# (3,3 Gio dispo). Le disque SSHD de l'hôte rend le démarrage d'OpenSearch très lent au boot.
+# Correctif : drop-ins systemd (configs/wazuh/) — indexer TimeoutStartSec=600 ;
+# manager After=wazuh-indexer.service pour étaler les accès disque au boot.

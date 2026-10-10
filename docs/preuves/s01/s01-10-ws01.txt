@@ -1,0 +1,41 @@
+# 2026-10-10 — VM ws01 (121) — Windows 11 Professionnel (fr-fr, build 26300)
+# Création : docs/semaine-01.md étape 7 (qm create 121 ..., TPM 2.0, 4 Go balloon min 2 Go, 64 Go)
+# Compte local labadmin (OOBE sans compte Microsoft), pilotes VirtIO + agent QEMU,
+# IP 10.10.10.30/24, passerelle 10.10.10.1, DNS 1.1.1.1, RDP activé, renommée ws01.
+# Accès RDP : ssh -L 3391:10.10.10.30:3389 root@192.168.1.150 puis mstsc localhost:3391
+
+# hostname; Get-NetIPAddress -AddressFamily IPv4 | ft InterfaceAlias,IPAddress; Test-NetConnection 1.1.1.1 -Port 443;
+# Test-NetConnection 192.168.1.40 -Port 22; Get-Service QEMU-GA; (Get-CimInstance Win32_OperatingSystem).Caption
+ws01
+
+InterfaceAlias              IPAddress
+--------------              ---------
+Ethernet                    10.10.10.30
+Loopback Pseudo-Interface 1 127.0.0.1
+
+AVERTISSEMENT : TCP connect to (192.168.1.40 : 22) failed
+AVERTISSEMENT : Ping to 192.168.1.40 failed with status: TimedOut
+
+ComputerName     : 1.1.1.1
+RemoteAddress    : 1.1.1.1
+RemotePort       : 443
+InterfaceAlias   : Ethernet
+SourceAddress    : 10.10.10.30
+TcpTestSucceeded : True
+
+ComputerName           : 192.168.1.40
+RemoteAddress          : 192.168.1.40
+RemotePort             : 22
+InterfaceAlias         : Ethernet
+SourceAddress          : 10.10.10.30
+PingSucceeded          : False
+PingReplyDetails (RTT) : 0 ms
+TcpTestSucceeded       : False
+
+Status      : Running
+Name        : QEMU-GA
+DisplayName : QEMU Guest Agent
+
+Microsoft Windows 11 Professionnel
+
+# => Internet via NAT OK ; lab -> LAN bloqué (isolation confirmée depuis ws01, comme depuis dc01) ; agent invité OK.

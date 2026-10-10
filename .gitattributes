@@ -1,0 +1,6 @@
+* text=auto
+# fichiers déployés sur Linux : toujours en LF
+*.conf text eol=lf
+*.interfaces text eol=lf
+*.sh text eol=lf
+*.png binary

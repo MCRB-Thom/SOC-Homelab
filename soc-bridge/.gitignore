@@ -1,0 +1,23 @@
+# Secrets — NE JAMAIS committer
+.env
+*.pem
+*.key
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Données locales générées
+data/
+*.db
+*.sqlite
+
+# Logs
+*.log
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,19 @@
+# 2026-10-08 — hôte Proxmox puis VM Wazuh (109) — ajout carte lab + RAM 8 → 5 Go
+# (hôte) qm set 109 --net1 virtio,bridge=vmbr1,firewall=0 --memory 5120
+# (hôte) qm start 109
+# (VM)   ip -br link; ip -br addr; free -h; grep -E '^-Xm[sx]' /etc/wazuh-indexer/jvm.options
+# IPv6 publique masquée.
+
+lo               UNKNOWN        00:00:00:00:00:00 <LOOPBACK,UP,LOWER_UP>
+enp6s18          UP             bc:24:11:69:d2:a0 <BROADCAST,MULTICAST,UP,LOWER_UP>
+enp6s19          DOWN           bc:24:11:18:5e:00 <BROADCAST,MULTICAST>
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+enp6s18          UP             192.168.1.40/24 2a01:xxxx:xxxx:xxxx:be24:11ff:fe69:d2a0/64 fe80::be24:11ff:fe69:d2a0/64
+enp6s19          DOWN
+               total       utilisé      libre     partagé tamp/cache   disponible
+Mem:           4,8Gi       3,6Gi       811Mi       768Ki       647Mi       1,2Gi
+Échange:       974Mi          0B       974Mi
+grep: /etc/wazuh-indexer/jvm.options: Permission non accordée
+
+# Constat : enp6s18 = LAN (net0), enp6s19 = nouvelle carte lab (net1, pas encore configurée).
+# 3,6 Go utilisés sur 4,8 Go : la heap de l'indexer est probablement encore réglée pour 8 Go.

@@ -1,0 +1,11 @@
+﻿# 2026-10-10 — VM Wazuh (109) — validation des drop-ins systemd par un arrêt/démarrage à froid
+# (VM)   drop-ins installés : voir configs/wazuh/wazuh-indexer.service.d/ et wazuh-manager.service.d/
+# (hôte) qm shutdown 109 && qm start 109   puis ~5 min d'attente
+# (VM)   systemctl is-active wazuh-indexer wazuh-manager wazuh-dashboard; systemd-analyze blame | grep wazuh
+active
+active
+active
+58.591s wazuh-indexer.service
+37.864s wazuh-manager.service
+
+# => les 3 services démarrent seuls ; indexer en ~59 s puis manager en ~38 s (démarré après l'indexer).

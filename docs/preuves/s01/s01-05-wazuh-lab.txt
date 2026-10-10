@@ -1,0 +1,30 @@
+# 2026-10-08 — VM Wazuh (109) — heap indexer + interface lab enp6s19
+# IPv6 publique masquée.
+
+# grep -E '^-Xm[sx]' /etc/wazuh-indexer/jvm.options   (déjà à 2g avant modification)
+-Xms2g
+-Xmx2g
+
+# printf 'auto enp6s19\niface enp6s19 inet static\n    address 10.10.10.10/24\n' | tee /etc/network/interfaces.d/lab && grep source /etc/network/interfaces && ifup enp6s19
+auto enp6s19
+iface enp6s19 inet static
+    address 10.10.10.10/24
+source /etc/network/interfaces.d/*
+
+# ip -br addr; ip route; ping -c2 10.10.10.1; systemctl is-active wazuh-indexer wazuh-manager wazuh-dashboard; free -h
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+enp6s18          UP             192.168.1.40/24 2a01:xxxx:xxxx:xxxx:be24:11ff:fe69:d2a0/64 fe80::be24:11ff:fe69:d2a0/64
+enp6s19          UP             10.10.10.10/24 fe80::be24:11ff:fe18:5e00/64
+default via 192.168.1.1 dev enp6s18
+10.10.10.0/24 dev enp6s19 proto kernel scope link src 10.10.10.10
+192.168.1.0/24 dev enp6s18 proto kernel scope link src 192.168.1.40
+PING 10.10.10.1 (10.10.10.1) 56(84) bytes of data.
+64 bytes from 10.10.10.1: icmp_seq=1 ttl=64 time=0.238 ms
+64 bytes from 10.10.10.1: icmp_seq=2 ttl=64 time=0.149 ms
+2 packets transmitted, 2 received, 0% packet loss, time 1001ms
+active      <- wazuh-indexer
+failed      <- wazuh-manager   (à diagnostiquer)
+active      <- wazuh-dashboard
+               total       utilisé      libre     partagé tamp/cache   disponible
+Mem:           4,8Gi       3,6Gi       845Mi       772Ki       657Mi       1,2Gi
+Échange:       974Mi          0B       974Mi

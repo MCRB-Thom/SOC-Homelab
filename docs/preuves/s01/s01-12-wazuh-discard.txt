@@ -1,0 +1,28 @@
+﻿# 2026-10-10 — hôte Proxmox + VM Wazuh (109) — disque thin "plein" à 99 % alors que le FS est à 56 %
+# Disque physique de l'hôte : lsblk -d -o NAME,ROTA,SIZE,MODEL
+NAME ROTA   SIZE MODEL
+sda     1 465.8G ST500LX012-SSHD-8GB        <- SSHD 2,5" 5400 tr/min : explique l'IO delay élevé
+
+# AVANT — lvs -o lv_name,lv_size,data_percent pve
+  data                          337.86g 60.17
+  vm-109-disk-0                  42.00g 99.37
+  vm-120-disk-1                  40.00g 17.73
+  vm-121-disk-1                  64.00g 31.65
+
+# Dans la VM : df -h /; du -sh /var/lib/wazuh-indexer /var/ossec/logs
+/dev/sda1           41G     22G   17G  56% /
+54M     /var/lib/wazuh-indexer
+208M    /var/ossec/logs
+
+# Diagnostic : blocs libérés dans la VM mais jamais rendus au thin pool (pas de discard sur scsi0).
+# Correctif :
+# (hôte) qm set 109 --scsi0 local-lvm:vm-109-disk-0,cache=writeback,iothread=1,discard=on && qm shutdown 109 && qm start 109
+# (VM)   fstrim -av; systemctl enable --now fstrim.timer
+
+# APRÈS — lvs -o lv_name,lv_size,data_percent pve | grep -E 'LV|data|vm-109'
+  LV                            LSize   Data%
+  data                          337.86g 55.45
+  snap_vm-109-disk-0_pre-lab-v2  42.00g
+  vm-109-disk-0                  42.00g 56.05
+
+# => vm-109 : 99,4 % -> 56,1 % ; thin pool : 60,2 % -> 55,5 % (~16 Go récupérés).

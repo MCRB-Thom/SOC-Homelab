@@ -1,0 +1,22 @@
+﻿# 2026-10-10 — hôte Proxmox — test de charge : wazuh (109) + dc01 (120) + ws01 (121) allumées ~15 min
+# free -h; cat /sys/kernel/mm/ksm/pages_sharing; qm list | grep -E 'VMID|running'; lvs -o lv_name,data_percent pve/data
+
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi        10Gi       1.8Gi        55Mi       3.2Gi       4.6Gi
+Swap:          8.0Gi          0B       8.0Gi
+0
+      VMID NAME                 STATUS     MEM(MB)    BOOTDISK(GB) PID
+       109 Wazuh                running    5120              42.00 10235
+       120 dc01                 running    2048              40.00 10177
+       121 ws01                 running    4096              64.00 1603
+  LV   Data%
+  data 60.13
+
+# Capture : docs/screenshots/s01-proxmox-ram-charge.png (Summary du nœud)
+# Résumé du nœud : RAM 70 % (10,9 / 15,56 Gio), swap 0, CPU ~7 %, IO delay 41 % (pics à ~80 %), load 3-8.
+
+# Verdict :
+# - RAM : OK. 4,6 Gio disponibles (critère : >= 1,5 Gio), aucun swap.
+# - KSM à 0 : normal, ksmtuned ne déclenche le partage qu'au-delà de ~80 % de RAM utilisée.
+# - Disque : point faible. IO delay élevé (premier démarrage de Win11 : mises à jour, Defender, indexation).
+# - Thin pool : 42,8 % -> 60,1 % (installation des 2 Windows + mises à jour). À surveiller.

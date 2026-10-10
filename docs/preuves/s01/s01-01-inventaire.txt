@@ -1,0 +1,51 @@
+# 2026-10-07 — hôte Proxmox — inventaire avant projet
+# pveversion; free -h; qm list; pct list; pvesm status; cat /etc/network/interfaces
+
+pve-manager/9.2.21/4f6e0ac86f9e8c7f (running kernel: 7.0.14-20-pve)
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi       1.7Gi        13Gi        47Mi       539Mi        13Gi
+Swap:          8.0Gi          0B       8.0Gi
+      VMID NAME                 STATUS     MEM(MB)    BOOTDISK(GB) PID
+       100 Winnie               stopped    14336            180.00 0
+       101 IPSEC1               stopped    2048              32.00 0
+       102 Win11Pentest         stopped    8192              64.00 0
+       103 IPSEC2               stopped    2048              32.00 0
+       104 Application-Web      stopped    8192             120.00 0
+       105 Proxy                stopped    2048              32.00 0
+       108 Mail                 stopped    8192              60.00 0
+       109 Wazuh                stopped    8192              42.00 0
+       110 VM3                  stopped    4096              32.00 0
+Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
+local             dir     active        98497780        21127152        72321080   21.45%
+local-lvm     lvmthin     active       354275328       181707815       172567512   51.29%
+auto lo
+iface lo inet loopback
+
+auto enp2s0
+iface enp2s0 inet manual
+        ethernet-wol g
+auto vmbr0
+iface vmbr0 inet static
+        address 192.168.1.150/24
+        gateway 192.168.1.1
+        bridge-ports enp2s0
+        bridge-stp off
+        bridge-fd 0
+
+source /etc/network/interfaces.d/*
+
+# qm config 109
+
+boot: order=scsi0;ide2;net0
+cores: 2
+cpu: host
+ide2: local:iso/debian-12.4.0-amd64-netinst.iso,media=cdrom,size=628M
+machine: q35
+memory: 8192
+name: Wazuh
+net0: virtio=BC:24:11:69:D2:A0,bridge=vmbr0,firewall=1
+numa: 0
+ostype: l26
+scsi0: local-lvm:vm-109-disk-0,cache=writeback,iothread=1,size=42G
+scsihw: virtio-scsi-single
+sockets: 1

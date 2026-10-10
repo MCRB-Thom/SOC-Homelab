@@ -1,0 +1,12 @@
+﻿# 2026-10-09 — hôte Proxmox — création de la VM ws01 (121)
+# qm create 121 --name ws01 --ostype win11 --machine q35 --bios ovmf --efidisk0 local-lvm:1,efitype=4m,pre-enrolled-keys=1 --tpmstate0 local-lvm:1,version=v2.0 --cpu host --cores 2 --memory 4096 --balloon 2048 --scsihw virtio-scsi-single --scsi0 local-lvm:64,iothread=1,discard=on --net0 virtio,bridge=vmbr1,firewall=0 --ide2 local:iso/Windows11_Client_x64_fr-fr_26300_9457.iso,media=cdrom --ide0 local:iso/virtio-win.iso,media=cdrom --boot 'order=ide2;scsi0' --agent enabled=1
+# (avertissements LVM "thin pool" répétitifs retirés : voir s01-02-snapshot.txt)
+
+  Logical volume "vm-121-disk-0" created.
+efidisk0: successfully created disk 'local-lvm:vm-121-disk-0,efitype=4m,ms-cert=2023k,pre-enrolled-keys=1,size=4M'
+  Logical volume "vm-121-disk-1" created.
+  WARNING: Sum of all thin volume sizes (676.02 GiB) exceeds the size of thin pool pve/data and the size of whole volume group (<464.76 GiB).
+scsi0: successfully created disk 'local-lvm:vm-121-disk-1,discard=on,iothread=1,size=64G'
+  Logical volume "vm-121-disk-2" created.
+tpmstate0: successfully created disk 'local-lvm:vm-121-disk-2,size=4M,version=v2.0'
+pinning machine type to 'pc-q35-11.0+pve2' for Windows guest OS

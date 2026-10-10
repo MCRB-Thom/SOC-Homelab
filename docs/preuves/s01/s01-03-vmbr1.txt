@@ -1,0 +1,27 @@
+# 2026-10-08 — hôte Proxmox — création du bridge lab vmbr1 (config : configs/proxmox/vmbr1.interfaces)
+# Appliqué à distance (VPN + SSH) avec un retour arrière automatique armé :
+# systemd-run --on-active=5min --unit=net-rollback sh -c 'cp /root/interfaces.bak-2026-10-08 /etc/network/interfaces && ifreload -a'
+
+# ifquery -a  (extrait vmbr1)
+auto vmbr1
+iface vmbr1 inet static
+        address 10.10.10.1/24
+        bridge-ports none
+        bridge-stp off
+        bridge-fd 0
+        bridge-ageing 0
+        post-up echo 1 > /proc/sys/net/ipv4/ip_forward
+        post-up iptables -t nat -A POSTROUTING -s 10.10.10.0/24 -o vmbr0 -j MASQUERADE
+        post-up iptables -I FORWARD -i vmbr1 -d 192.168.1.0/24 -j DROP
+        post-down iptables -t nat -D POSTROUTING -s 10.10.10.0/24 -o vmbr0 -j MASQUERADE
+        post-down iptables -D FORWARD -i vmbr1 -d 192.168.1.0/24 -j DROP
+
+# ifreload -a
+# ip -br addr show vmbr0; ip -br addr show vmbr1; iptables -t nat -L POSTROUTING -n | grep 10.10.10
+vmbr0            UP             192.168.1.150/24 fe80::2ef0:5dff:fe22:b021/64
+vmbr1            UNKNOWN        10.10.10.1/24 fe80::9038:f4ff:fe66:1672/64
+MASQUERADE  all  --  10.10.10.0/24        0.0.0.0/0
+
+# grep -c vmbr1 /etc/network/interfaces; ip -br addr show vmbr1   (config persistante, SSH intact)
+4
+vmbr1            UNKNOWN        10.10.10.1/24 fe80::9038:f4ff:fe66:1672/64

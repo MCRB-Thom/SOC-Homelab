@@ -1,0 +1,33 @@
+﻿# 2026-10-10 — hôte Proxmox — snapshots de fin de semaine 1
+# for id in 109 120 121; do qm snapshot $id s01-base --description "Fin semaine 1 - lab de base"; done; qm listsnapshot 109; qm listsnapshot 121
+# (avertissements LVM "thin pool" répétitifs retirés : voir s01-02-snapshot.txt)
+
+skipping guest filesystem freeze - disabled in VM options        <- 109 : agent QEMU non activé sur Wazuh
+snapshotting 'drive-scsi0' (local-lvm:vm-109-disk-0)
+  Logical volume "snap_vm-109-disk-0_s01-base" created.
+freeze guest filesystem
+snapshotting 'drive-scsi0' (local-lvm:vm-120-disk-1)
+  Logical volume "snap_vm-120-disk-1_s01-base" created.
+snapshotting 'drive-efidisk0' (local-lvm:vm-120-disk-0)
+  Logical volume "snap_vm-120-disk-0_s01-base" created.
+thaw guest filesystem
+guest-fsfreeze-thaw problems - VM 120 qga command 'guest-fsfreeze-thaw' failed - got timeout   <- voir ci-dessous
+freeze guest filesystem
+snapshotting 'drive-scsi0' (local-lvm:vm-121-disk-1)
+  Logical volume "snap_vm-121-disk-1_s01-base" created.
+snapshotting 'drive-efidisk0' (local-lvm:vm-121-disk-0)
+  Logical volume "snap_vm-121-disk-0_s01-base" created.
+snapshotting 'drive-tpmstate0' (local-lvm:vm-121-disk-2)
+  Logical volume "snap_vm-121-disk-2_s01-base" created.
+  WARNING: Sum of all thin volume sizes (822.03 GiB) exceeds the size of thin pool pve/data and the size of whole volume group (<464.76 GiB).
+thaw guest filesystem
+`-> pre-lab-v2                  2026-10-08 16:40:27     Avant projet SOC v2 - 2026-10-08
+ `-> s01-base                   2026-10-10 15:11:04     Fin semaine 1 - lab de base
+  `-> current                                           You are here!
+`-> s01-base                    2026-10-10 15:14:38     Fin semaine 1 - lab de base
+ `-> current                                            You are here!
+
+# Capture : docs/screenshots/s01-wazuh-snapshots.png
+# dc01 : le "thaw" (dégel du système de fichiers via VSS) a dépassé le délai de l'agent QEMU,
+# probablement à cause du disque lent. Windows dégèle seul après ~10 s ; état à vérifier avec
+# qm guest cmd 120 fsfreeze-status (attendu : "thawed").
