@@ -1,0 +1,12 @@
+# 2026-10-11 — VM Wazuh (109) — arrêt de Suricata jusqu'à la semaine 4
+# systemctl stop suricata; systemctl disable suricata; systemctl is-active suricata
+Synchronizing state of suricata.service with SysV service script with /lib/systemd/systemd-sysv-install.
+Executing: /lib/systemd/systemd-sysv-install disable suricata
+Removed "/etc/systemd/system/multi-user.target.wants/suricata.service".
+inactive
+
+# hôte Proxmox — snapshots s02-domaine (créés à 14:25:04 ; une seconde exécution de la boucle a été refusée : "already used")
+# qm listsnapshot 121
+`-> s01-base                    2026-10-10 15:14:38     Fin semaine 1 - lab de base
+ `-> s02-domaine                2026-10-11 14:25:04     Domaine soclab.internal + ws01 joint + GPO
+  `-> current                                           You are here!

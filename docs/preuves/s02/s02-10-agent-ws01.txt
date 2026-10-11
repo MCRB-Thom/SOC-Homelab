@@ -1,0 +1,26 @@
+# 2026-10-11 — ws01 (121) — installation de l'agent Wazuh 4.14.6 (groupe "windows")
+# Invoke-WebRequest https://packages.wazuh.com/4.x/windows/wazuh-agent-4.14.6-1.msi
+# Get-AuthenticodeSignature (contrôle avant installation)
+Valid - CN="Wazuh, Inc", O="Wazuh, Inc", L=Campbell, S=California, C=US, ...
+# msiexec /i wazuh-agent.msi /q WAZUH_MANAGER=10.10.10.10 WAZUH_AGENT_NAME=ws01 WAZUH_AGENT_GROUP=windows ; Start-Service WazuhSvc
+
+# Get-Service WazuhSvc
+Name      Status StartType
+----      ------ ---------
+WazuhSvc Running Automatic
+
+# Get-Content "C:\Program Files (x86)\ossec-agent\ossec.log" -Tail 10
+2026/10/11 22:58:38 rootcheck: INFO: Starting rootcheck scan.
+2026/10/11 22:58:38 rootcheck: WARNING: No winmalware file: './shared/win_malware_rcl.txt'
+2026/10/11 22:58:38 rootcheck: WARNING: No winapps file: './shared/win_applications_rcl.txt'
+2026/10/11 22:58:41 wazuh-agent: INFO: Agent is now online. Process unlocked, continuing...
+2026/10/11 22:58:43 rootcheck: INFO: Ending rootcheck scan.
+2026/10/11 22:59:02 wazuh-agent: INFO: (6009): File integrity monitoring scan ended.
+2026/10/11 22:59:02 wazuh-agent: INFO: FIM sync module started.
+2026/10/11 22:59:04 wazuh-agent: INFO: (6012): Real-time file integrity monitoring started.
+2026/10/11 22:59:18 sca: INFO: Evaluation finished for policy 'C:\Program Files (x86)\ossec-agent\ruleset\sca\cis_win11_enterprise.yml'
+2026/10/11 22:59:19 sca: INFO: Security Configuration Assessment scan finished. Duration: 75 seconds.
+
+# => agent en ligne ; FIM (intégrité des fichiers) et SCA (benchmark CIS Windows 11) actifs.
+#    Les avertissements rootcheck (fichiers win_malware/win_applications absents) sont sans effet :
+#    ces bases ne sont plus fournies par défaut.

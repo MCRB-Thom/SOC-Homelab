@@ -4,6 +4,19 @@ Format : une entrée par session de travail, la plus récente en haut.
 Chaque entrée indique ce qui a changé dans le lab, pourquoi, et la preuve
 (`docs/preuves/`, `docs/screenshots/`).
 
+## 2026-10-11 — Semaine 2 : domaine AD, Sysmon, agents Wazuh
+
+### Fait
+- Bruit Wazuh identifié : ~22 000 alertes/jour `SURICATA STREAM` venant d'un Suricata hérité qui capturait le LAN. Suricata arrêté jusqu'à la semaine 4 ; 3 agents hérités supprimés.
+- Forêt `soclab.internal` (dc01), OU `Lab/Utilisateurs` et `Lab/Postes`, utilisateur standard `j.martin`, `ws01` joint au domaine.
+- GPO `LAB - Mises a jour manuelles` liée à `OU=Lab` ; Windows Search désactivé sur `ws01`.
+- Sysmon v15.22 + sysmon-modular 15.21 (SHA-256 vérifié) sur `dc01` et `ws01` (`configs/sysmon/`).
+- Agents Wazuh 4.14.6 (signature vérifiée) sur `dc01` et `ws01`, groupe `windows` avec collecte du canal Sysmon (`configs/wazuh/shared/windows/agent.conf`).
+- Snapshot `s02-domaine` (109, 120, 121).
+
+### Limites
+- Enrôlement des agents sans mot de passe (lab isolé uniquement).
+
 ## 2026-10-10 — Semaine 1 : ws01
 
 ### Fait

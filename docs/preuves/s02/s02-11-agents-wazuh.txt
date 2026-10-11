@@ -1,0 +1,17 @@
+# 2026-10-11 — VM Wazuh (109) — agents enrôlés et premiers événements Sysmon
+# Groupe "windows" créé : agent_groups -a -g windows ; agent.conf = configs/wazuh/shared/windows/agent.conf
+# Agent dc01 installé comme ws01 (voir s02-10), avec WAZUH_AGENT_NAME=dc01
+
+# /var/ossec/bin/agent_control -l; /var/ossec/bin/agent_groups -l -g windows; grep -c Sysmon /var/ossec/logs/alerts/alerts.json
+Wazuh agent_control. List of available agents:
+   ID: 000, Name: WAZUH (server), IP: 127.0.0.1, Active/Local
+   ID: 001, Name: ws01, IP: any, Active
+   ID: 002, Name: dc01, IP: any, Active
+
+2 agent(s) in group 'windows':
+  ID: 001  Name: ws01.
+  ID: 002  Name: dc01.
+37
+
+# => les deux machines Windows remontent dans Wazuh ; la configuration centralisée du groupe a ajouté
+#    le canal Microsoft-Windows-Sysmon/Operational : 37 alertes Sysmon déjà présentes dans alerts.json.

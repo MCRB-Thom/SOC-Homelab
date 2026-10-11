@@ -1,0 +1,28 @@
+# 2026-10-10 — VM Wazuh (109) — état initial avant la semaine 2
+# /var/ossec/bin/agent_control -l
+
+Wazuh agent_control. List of available agents:
+   ID: 000, Name: WAZUH (server), IP: 127.0.0.1, Active/Local
+   ID: 001, Name: pentest, IP: any, Disconnected
+   ID: 002, Name: Logs, IP: any, Disconnected
+   ID: 003, Name: WinClient1, IP: any, Disconnected
+
+# Règles les plus fréquentes dans les alertes du jour (alerts.json)
+# grep -o '"rule":{"level":[0-9]*,"description":"[^"]*"' /var/ossec/logs/alerts/alerts.json | sort | uniq -c | sort -rn | head -15
+     11 "rule":{"level":12,"description":"System user successfully logged to the system."
+      7 "rule":{"level":3,"description":"PAM: Login session opened."
+      4 "rule":{"level":3,"description":"PAM: Login session closed."
+      3 "rule":{"level":3,"description":"Wazuh server started."
+      2 "rule":{"level":5,"description":"PAM: User login failed."
+      2 "rule":{"level":3,"description":"syslog: Physical root login."
+      1 "rule":{"level":5,"description":"sshd: authentication failed."
+      1 "rule":{"level":4,"description":"sshd: connection reset"
+      1 "rule":{"level":3,"description":"Suricata: Alert - SURICATA STREAM TIMEWAIT ACK with wrong seq"
+
+# Constats :
+# - 3 agents hérités d'anciens projets (001-003), déconnectés.
+# - Le fichier du jour ne contient que ~32 alertes : les ~22 000 alertes "24 h" du dashboard
+#   viennent de la veille (fichier archivé), à analyser.
+# - Les 11 alertes de niveau 12 (les "High severity" du dashboard) correspondent aux connexions
+#   d'administration (su / SSH) effectuées pendant la semaine 1 : faux positifs d'activité légitime.
+# - Une alerte Suricata est présente : une ancienne intégration Suricata existe déjà.

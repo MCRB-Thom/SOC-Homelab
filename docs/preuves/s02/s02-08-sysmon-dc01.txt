@@ -1,0 +1,34 @@
+# 2026-10-11 — dc01 (120) — installation de Sysmon (config sysmon-modular 15.21, voir configs/sysmon/)
+# $d = "C:\Tools\Sysmon"; téléchargement Sysmon.zip (Sysinternals) + sysmonconfig-15.21.xml (release configs-082cba578667)
+# Vérification SHA-256 avant installation (F115AAC5...244B) puis : Sysmon64.exe -accepteula -i sysmonconfig.xml
+
+System Monitor v15.22 - System activity monitor
+Loading configuration file with schema version 4.91
+Configuration file validated.
+Sysmon64 installed.
+SysmonDrv installed.
+Starting SysmonDrv.
+SysmonDrv started.
+Starting Sysmon64......
+Sysmon64 started.
+
+# hostname; version; Get-Service Sysmon64; 5 derniers événements Sysmon avec RuleName
+dc01
+15.22
+
+Name      Status StartType
+----      ------ ---------
+Sysmon64 Running Automatic
+
+TimeCreated         Id Regle
+-----------         -- -----
+11/10/2026 15:06:29 13 RuleName: technique_id=T1053,technique_name=Scheduled Task/Job
+11/10/2026 15:06:29  7 RuleName: technique_id=T1053,technique_name=Scheduled Task/Job
+11/10/2026 15:06:10 11 RuleName: technique_id=T1574.010,technique_name=Services File Permissions Weakness
+11/10/2026 15:06:01 13 RuleName: technique_id=T1053,technique_name=Scheduled Task/Job
+11/10/2026 15:06:01  7 RuleName: technique_id=T1053,technique_name=Scheduled Task/Job
+
+# => Sysmon actif ; les événements portent déjà l'étiquette ATT&CK de la règle qui les a capturés
+#    (ID 13 = modification de registre, 7 = chargement d'image, 11 = création de fichier).
+#    Ici, activité système normale (tâches planifiées) : l'étiquette indique ce que la règle
+#    surveille, pas qu'une attaque a eu lieu.

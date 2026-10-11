@@ -5,7 +5,7 @@ basé sur un LLM qui tourne en local (Ollama). L'objectif est de **mesurer**
 ce que le lab détecte (couverture MITRE ATT&CK) et ce que vaut le LLM sur le
 triage (précision / rappel), pas seulement d'empiler des outils.
 
-> Statut : **semaine 1 terminée** — lab de base en place (voir [CHANGELOG](CHANGELOG.md)) · prochaine étape : domaine AD + Sysmon
+> Statut : **semaine 2 terminée** — domaine AD, Sysmon et agents Wazuh en place (voir [CHANGELOG](CHANGELOG.md)) · prochaine étape : validation de la chaîne de détection Sysmon → Wazuh
 
 ## Architecture
 
@@ -43,7 +43,7 @@ flowchart LR
 | Phase | Contenu | Livrable | Statut |
 |---|---|---|---|
 | S1 | Snapshot, dépôt, réseau lab, VM Windows | Dépôt + schéma | ✅ terminé |
-| S2–S3 | Domaine AD, Sysmon, agents Wazuh | Captures d'alertes Sysmon + config versionnée | 🟡 suivant |
+| S2–S3 | Domaine AD, Sysmon, agents Wazuh | Captures d'alertes Sysmon + config versionnée | 🟡 S2 faite, S3 en cours |
 | S4 | Suricata (ET Open) → Wazuh | Tableau « attaque → détecté par quoi » | ⬜ |
 | S5–S6 | Atomic Red Team + Kerberoasting | Matrice de couverture ATT&CK + angles morts | ⬜ |
 | S7–S8 | Évaluation du pipeline LLM | Précision / rappel / FP + limites et sécurité | ⬜ |
@@ -62,7 +62,7 @@ Règle : si une phase déborde, on supprime la suivante plutôt que de bâcler.
 ├── configs/                ← configs versionnées (sysmon, wazuh, suricata, proxmox)
 └── docs/
     ├── architecture.md     ← schémas actuel/cible, plan IP, budget RAM
-    ├── semaine-01.md       ← runbook de la semaine 1
+    ├── semaine-NN.md       ← compte rendu de chaque semaine
     ├── preuves/            ← sorties de commandes brutes (.txt) par semaine
     └── screenshots/        ← captures des interfaces graphiques
 ```

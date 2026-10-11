@@ -1,0 +1,11 @@
+# 2026-10-11 — ws01 (121) — installation de Sysmon (même procédure et même config que dc01, voir s02-08)
+
+System Monitor v15.22 - System activity monitor
+Loading configuration file with schema version 4.91
+Configuration file validated.
+Sysmon64 installed.
+SysmonDrv installed.
+Starting SysmonDrv.
+SysmonDrv started.
+Starting Sysmon64...
+Sysmon64 started.

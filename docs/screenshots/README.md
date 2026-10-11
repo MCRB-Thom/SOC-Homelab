@@ -18,3 +18,10 @@ Nommage : `sNN-<sujet>.png`.
 | `s01-isolation-lab-vers-lan.png` | Test d'isolation : le lab ne joint pas le LAN |
 | `s01-proxmox-ram-charge.png` | Résumé de l'hôte avec les trois VM allumées |
 | `s01-wazuh-snapshots.png` | Snapshots `pre-lab-v2` et `s01-base` de la VM Wazuh |
+
+## Semaine 2
+
+| Fichier | Contenu |
+|---|---|
+| `s02-dc01-domaine.png` | Domaine `soclab.internal` opérationnel (AD DS, DNS, Netlogon) |
+| `s02-ws01-domaine.png` | Session d'un utilisateur du domaine sur `ws01` |

@@ -1,0 +1,22 @@
+# 2026-10-11 — VM Wazuh (109) — configuration de l'instance Suricata héritée
+# suricata -V; grep -A4 '^af-packet' /etc/suricata/suricata.yaml; grep -nE 'default-rule-path|^rule-files' -A2 /etc/suricata/suricata.yaml;
+# ls -la /var/lib/suricata/rules/; grep -B1 -A3 'suricata' /var/ossec/etc/ossec.conf
+This is Suricata version 7.0.10 RELEASE
+af-packet:
+  - interface: enp6s18
+2187:default-rule-path: /var/lib/suricata/rules
+2189:rule-files:
+2190-  - suricata.rules
+total 43812
+-rw-r--r-- 1 root root     3228  8 juil. 14:16 classification.config
+-rw-r--r-- 1 root root 44850923  8 juil. 14:16 suricata.rules
+        <log_format>json</log_format>
+        <location>/var/log/suricata/eve.json</location>
+    </localfile>
+
+# Constats :
+# - Capture sur enp6s18 = interface LAN : Suricata surveille le réseau domestique, pas le lab.
+# - Règles (suricata-update) datant du 8 juillet : à mettre à jour.
+# - Intégration Wazuh déjà en place (localfile eve.json au format json).
+# Décision : Suricata arrêté et désactivé jusqu'à la semaine 4 (reconfiguration sur enp6s19 = lab,
+# mise à jour ET Open, filtrage du bruit STREAM), pour garder une base propre pendant le déploiement Sysmon.

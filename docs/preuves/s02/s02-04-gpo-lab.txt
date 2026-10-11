@@ -1,0 +1,27 @@
+# 2026-10-10 — dc01 + ws01 — GPO "LAB - Mises a jour manuelles" et allègement des E/S disque
+# (dc01)
+# $gpo = New-GPO -Name "LAB - Mises a jour manuelles" -Comment "Lab sur disque lent : pas de Windows Update automatique ..."
+# Set-GPRegistryValue -Name $gpo.DisplayName -Key "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -ValueName NoAutoUpdate -Type DWord -Value 1
+# New-GPLink -Name $gpo.DisplayName -Target "OU=Lab,DC=soclab,DC=internal"
+
+# (ws01, SOCLAB\Administrateur) gpupdate /force; gpresult /r /scope computer | Select-String "LAB"; nltest /sc_verify:soclab.internal
+La mise à jour de la stratégie d'ordinateur s'est terminée sans erreur.
+La mise à jour de la stratégie utilisateur s'est terminée sans erreur.
+
+    CN=WS01,OU=Postes,OU=Lab,DC=soclab,DC=internal
+    Stratégie de groupe appliquée depuis :      dc01.soclab.internal
+    Nom du domaine......................... : SOCLAB
+        LAB - Mises a jour manuelles
+Indicateurs : 400000b0 HAS_IP  HAS_TIMESERV  Service d'authentification : Netlogon
+Nom du contrôleur de domaine approuvé \dc01.soclab.internal
+Statut de la connexion du contrôleur de domaine approuvé Status = 0 0x0 NERR_Success
+Vérification de l'approbation Status = 0 0x0 NERR_Success
+La commande a été correctement exécutée
+
+# (ws01) Stop-Service WSearch -Force; Set-Service WSearch -StartupType Disabled; Get-Service WSearch | ft Name,Status,StartType
+Name     Status StartType
+----     ------ ---------
+WSearch Stopped  Disabled
+
+# => GPO appliquée à ws01 (OU=Postes,OU=Lab) ; canal sécurisé ws01 <-> dc01 vérifié (NERR_Success) ;
+#    indexation Windows désactivée. Defender laissé actif (réalisme, mesuré en S5-S6).

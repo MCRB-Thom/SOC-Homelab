@@ -1,0 +1,29 @@
+# 2026-10-11 — VM Wazuh (109) — origine du bruit et nettoyage des anciens agents (Wazuh v4.14.6)
+
+# Alertes de la veille (les ~22 000 alertes "24 h" du dashboard)
+# zcat /var/ossec/logs/alerts/2026/Oct/ossec-alerts-09.json.gz | grep -o '"rule":{"level":[0-9]*,"description":"[^"]*"' | sort | uniq -c | sort -rn | head -10
+  10982 "rule":{"level":3,"description":"Suricata: Alert - SURICATA STREAM ESTABLISHED packet out of window"
+   5573 "rule":{"level":3,"description":"Suricata: Alert - SURICATA STREAM Packet with invalid ack"
+   5573 "rule":{"level":3,"description":"Suricata: Alert - SURICATA STREAM ESTABLISHED invalid ack"
+      1 "rule":{"level":3,"description":"Wazuh server started."
+      1 "rule":{"level":3,"description":"Suricata: Alert - SURICATA IPv6 truncated packet"
+      1 "rule":{"level":3,"description":"Suricata: Alert - SURICATA AF-PACKET truncated packet"
+
+# systemctl is-active suricata; ls /var/log/suricata/
+active
+eve.json  eve.json.1.gz  eve.json.2.gz  fast.log  fast.log.1.gz  fast.log.2.gz  stats.log  stats.log.1.gz  stats.log.2.gz  suricata.log
+
+# Suppression des agents hérités (manage_agents -r 001 / 002 / 003, confirmation "y")
+Agent '001' removed.   (pentest)
+Agent '002' removed.   (Logs)
+Agent '003' removed.   (WinClient1)
+
+# /var/ossec/bin/agent_control -l
+   ID: 000, Name: WAZUH (server), IP: 127.0.0.1, Active/Local
+
+# Constats :
+# - 99,9 % du bruit = règles de décodage de flux SURICATA STREAM (anomalies TCP), pas des attaques.
+#   Suricata, hérité d'un ancien projet, tourne déjà sur la VM Wazuh et écoute vraisemblablement
+#   l'interface LAN : bruit typique d'une capture sur un hôte (offloading carte réseau, trafic asymétrique).
+# - Capturer le LAN domestique n'est ni utile au lab ni souhaitable (trafic personnel du foyer).
+# - Il ne reste que l'agent 000 : inventaire propre avant l'enrôlement de dc01 et ws01.

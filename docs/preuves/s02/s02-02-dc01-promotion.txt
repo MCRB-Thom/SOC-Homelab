@@ -1,0 +1,29 @@
+# 2026-10-10 — dc01 (120) — promotion en contrôleur de domaine (forêt soclab.internal)
+# Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
+# Install-ADDSForest -DomainName soclab.internal -DomainNetbiosName SOCLAB -InstallDns -SafeModeAdministratorPassword (Read-Host -AsSecureString "Mot de passe DSRM") -Force
+#   Avertissements attendus en lab : algorithmes NT 4.0, délégation DNS impossible (pas de zone parente).
+#   Premier essai refusé : mot de passe DSRM ne respectant pas la complexité requise (aucun changement appliqué).
+
+# Après redémarrage, session SOCLAB\Administrateur :
+# Get-ADDomain | ft DNSRoot,NetBIOSName,DomainMode; Get-Service NTDS,DNS,Netlogon | ft Name,Status;
+# Add-DnsServerForwarder -IPAddress 1.1.1.1; Resolve-DnsName soclab.internal; Resolve-DnsName github.com | select -First 1
+
+DNSRoot         NetBIOSName        DomainMode
+-------         -----------        ----------
+soclab.internal SOCLAB      Windows2016Domain
+
+Name      Status
+----      ------
+DNS      Running
+Netlogon Running
+NTDS     Running
+
+AVERTISSEMENT : Adresse IP 1.1.1.1 déjà configurée en tant que redirecteur sur le serveur DC01.
+
+Name            Type TTL Section IPAddress
+----            ---- --- ------- ---------
+soclab.internal A    600 Answer  10.10.10.20
+github.com      A    22  Answer  140.82.121.3
+
+# => domaine opérationnel (AD DS, DNS, Netlogon) ; la promotion a repris le DNS initial 1.1.1.1
+#    comme redirecteur : résolution interne et Internet OK.
