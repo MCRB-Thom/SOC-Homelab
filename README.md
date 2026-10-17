@@ -5,7 +5,7 @@ basé sur un LLM qui tourne en local (Ollama). L'objectif est de **mesurer**
 ce que le lab détecte (couverture MITRE ATT&CK) et ce que vaut le LLM sur le
 triage (précision / rappel), pas seulement d'empiler des outils.
 
-> Statut : **semaine 2 terminée** — domaine AD, Sysmon et agents Wazuh en place (voir [CHANGELOG](CHANGELOG.md)) · prochaine étape : validation de la chaîne de détection Sysmon → Wazuh
+> Statut : **semaine 3 terminée** — chaîne Sysmon → Wazuh testée, un angle mort corrigé, bruit réglé, lab sur SSD (voir [compte rendu](docs/semaine-03.md) et [CHANGELOG](CHANGELOG.md)) · prochaine étape : Suricata → Wazuh (S4)
 
 ## Architecture
 
@@ -14,7 +14,7 @@ Résumé (détails, plan IP et budget RAM dans [docs/architecture.md](docs/archi
 | Machine | Rôle | Où |
 |---|---|---|
 | PC portable (RTX 4050 6 Go) | Ollama (Llama 3.1 8B, Qwen, Mistral) + `soc-bridge` | LAN |
-| Serveur Proxmox (i5-9400F, 16 Go) | Hyperviseur du lab | LAN |
+| Serveur Proxmox (i5-9400F, 16 Go, VM du lab sur SSD) | Hyperviseur du lab | LAN |
 | VM `wazuh` | Wazuh manager / indexer / dashboard + Suricata (IDS) | LAN + lab |
 | VM `dc01` | Contrôleur de domaine AD (Windows Server 2022 Core) | lab |
 | VM `ws01` | Poste Windows 11 joint au domaine (Sysmon, Atomic Red Team) | lab |
@@ -43,7 +43,7 @@ flowchart LR
 | Phase | Contenu | Livrable | Statut |
 |---|---|---|---|
 | S1 | Snapshot, dépôt, réseau lab, VM Windows | Dépôt + schéma | ✅ terminé |
-| S2–S3 | Domaine AD, Sysmon, agents Wazuh | Captures d'alertes Sysmon + config versionnée | 🟡 S2 faite, S3 en cours |
+| S2–S3 | Domaine AD, Sysmon, agents Wazuh, validation de la chaîne de détection | Captures d'alertes Sysmon + config versionnée | ✅ terminé |
 | S4 | Suricata (ET Open) → Wazuh | Tableau « attaque → détecté par quoi » | ⬜ |
 | S5–S6 | Atomic Red Team + Kerberoasting | Matrice de couverture ATT&CK + angles morts | ⬜ |
 | S7–S8 | Évaluation du pipeline LLM | Précision / rappel / FP + limites et sécurité | ⬜ |
@@ -60,6 +60,7 @@ Règle : si une phase déborde, on supprime la suivante plutôt que de bâcler.
 ├── docker-compose.yml      ← Ollama (GPU) sur le PC
 ├── soc-bridge/             ← pont Wazuh Indexer → Ollama → SQLite (+ dashboard Streamlit)
 ├── configs/                ← configs versionnées (sysmon, wazuh, suricata, proxmox)
+│   └── wazuh/rules/        ← règles Wazuh locales + leurs tests hors ligne
 └── docs/
     ├── architecture.md     ← schémas actuel/cible, plan IP, budget RAM
     ├── semaine-NN.md       ← compte rendu de chaque semaine
@@ -68,6 +69,30 @@ Règle : si une phase déborde, on supprime la suivante plutôt que de bâcler.
 ```
 
 ## Résultats
+
+### Semaine 3 — premier test de la chaîne de détection
+
+Reconnaissance bénigne lancée par un utilisateur standard du domaine sur `ws01`
+([détail](docs/semaine-03.md#3-test-de-la-chaîne-de-détection)) :
+
+| Mesure | Résultat |
+|---|---|
+| Commandes journalisées par Sysmon | 5 sur 6 (`nltest /dclist` manquant) |
+| Commandes alertées explicitement par Wazuh | 2 sur 6, en niveau 3 |
+| Alerte la plus grave de la fenêtre | faux positif de niveau 15 (fichier de test de PowerShell) |
+| Délai événement → alerte | ~3 s |
+
+Actions qui en découlent :
+
+- **Angle mort `nltest`** : défaut de la config sysmon-modular (`nltestrk.exe`
+  non couvert). Corrigé par une règle Sysmon locale et la règle Wazuh 100100
+  (niveau 8) ([section 4](docs/semaine-03.md#4-angle-mort-nltest--cause-et-correction)).
+- **Bruit** : 24 alertes PowerShell par jour (niveaux 9 à 15) et ~1 000 alertes
+  par mise à jour de OneDrive, filtrées par deux règles de niveau 0 et vérifiées
+  en conditions réelles : 26 fichiers créés, 0 alerte
+  ([section 5](docs/semaine-03.md#5-réglage-du-bruit)).
+- **Infrastructure** : passage des VM sur SSD, démarrage de l'indexer Wazuh
+  274 s → 19 s ([section 2](docs/semaine-03.md#2-passage-sur-ssd)).
 
 _À venir :_ matrice de couverture ATT&CK (S6), métriques du classifieur LLM (S8).
 
