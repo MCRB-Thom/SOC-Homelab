@@ -1,0 +1,115 @@
+# 2026-10-17 — VM Wazuh (109) — réglage du bruit : règles locales 100110 (PSScriptPolicyTest) et 100111 (OneDrive)
+# Fichier : configs/wazuh/rules/soclab_rules.xml
+
+# --- Tests hors ligne des expressions régulières (PC d'administration, Python, chemins réels des alertes,
+#     antislashs doublés comme dans les champs eventchannel de Wazuh) ---
+OK  100110 attendu ignoré | powershell.exe -> __PSScriptPolicyTest_5okk3jef.uw0.ps1
+OK  100110 attendu ignoré | pwsh.exe -> __PSScriptPolicyTest_abcd1234.x1y.ps1
+OK  100110 attendu alerte | powershell.exe -> payload.ps1
+OK  100110 attendu alerte | evil.exe -> __PSScriptPolicyTest_5okk3jef.uw0.ps1
+OK  100111 attendu ignoré | OneDriveSetup.exe -> CollectSyncLogs.bat
+OK  100111 attendu ignoré | OneDriveSetup.exe -> fre_done.js
+OK  100111 attendu alerte | OneDriveSetup.exe -> run.ps1            (bon programme, mauvais dossier)
+OK  100111 attendu alerte | OneDriveSetup.exe -> x.js               (OneDriveSetup.exe hors de son dossier)
+TOUS LES TESTS PASSENT
+
+# --- Mesure "avant" (alertes du 17/10 depuis minuit) ---
+# (VM) script Python sur /var/ossec/logs/alerts/alerts.json : targetFilename contenant PSScriptPolicyTest,
+#      et 92200 dont l'image est OneDriveSetup.exe
+{'PSScriptPolicyTest (92213)': 4, 'PSScriptPolicyTest (92201)': 9, 'PSScriptPolicyTest (92205)': 11, 'OneDrive (92200)': 1085} | heure : 15:58
+
+# Constat : le même fichier __PSScriptPolicyTest déclenche trois règles différentes (92201, 92205, 92213).
+# La première version de 100110 ne visait que 92200 et 92213 : corrigée avant déploiement
+# (<if_sid>92200, 92201, 92205, 92213</if_sid>). Mesurer avant de régler a évité un réglage incomplet.
+
+# --- Diagnostic : qui crée ces fichiers, et où ? (alertes du 17/10) ---
+# rule.id | niveau | description | programme | dossier de l'image
+1085 | 92200 | 6 | Scripting file created under Windows Temp or User folder | OneDriveSetup.exe | Administrateur
+11 | 92205 | 9 | Powershell process created an executable file in Windows roo | powershell.exe | SysWOW64
+9 | 92201 | 9 | C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.e | powershell.exe | SysWOW64
+3 | 92213 | 15 | Executable file dropped in folder commonly used by malware | powershell.exe | System32
+1 | 92213 | 15 | Executable file dropped in folder commonly used by malware | sdiagnhost.exe | -
+# rule.id | dossier du fichier créé | utilisateur
+11 | 92205 | C:\Windows\SystemTemp | AUTORITE NT\Système
+9 | 92201 | C:\Windows\Temp | AUTORITE NT\Système
+2 | 92213 | C:\Users\Administrateur\AppData\Local\Temp | SOCLAB\Administrateur
+1 | 92213 | C:\Users\Administrateur\AppData\Local\Temp\2 | SOCLAB\Administrateur
+1 | 92213 | C:\Users\Administrateur\AppData\Local\Temp\1 | SOCLAB\Administrateur
+
+# Constats :
+# - Les 1 085 alertes OneDrive du jour : installation de OneDrive dans le nouveau profil SOCLAB\Administrateur.
+# - 20 alertes sur 24 viennent d'un PowerShell 32 bits (SysWOW64) lancé par AUTORITE NT\Système, niveau 9.
+#   Hypothèse : l'agent Wazuh (32 bits) qui lance PowerShell pour ses modules (SCA, inventaire). À confirmer
+#   par le processus parent (absent des événements de création de fichier).
+# - Dossiers non prévus par la 1re expression : C:\Windows\SystemTemp et Temp\<n> (dossier temporaire par
+#   session RDP). L'ancienne expression les ratait : elle n'aurait filtré que 11 alertes sur 24
+#   (Windows\Temp et Temp du profil), en laissant passer SystemTemp (11) et Temp\<n> (2).
+# - sdiagnhost.exe (outils de dépannage Windows) crée aussi ce fichier : volontairement NON filtré (1/jour).
+
+# --- Tests hors ligne, expression corrigée (configs/wazuh/rules/test_soclab_rules.py) ---
+# (?i)\\\\(System)?Temp\\\\(\d+\\\\)?__PSScriptPolicyTest_[a-z0-9]{8}\.[a-z0-9]{3}\.ps1$
+OK 100110 attendu ignoré | v1.0\powershell.exe -> Local\Temp\__PSScriptPolicyTest_5okk3jef.uw0.ps1
+OK 100110 attendu ignoré | v1.0\powershell.exe -> Temp\2\__PSScriptPolicyTest_ab12cd34.ef5.ps1
+OK 100110 attendu ignoré | v1.0\powershell.exe -> Windows\SystemTemp\__PSScriptPolicyTest_ab12cd34.ef5.ps1
+OK 100110 attendu ignoré | v1.0\powershell.exe -> Windows\Temp\__PSScriptPolicyTest_ab12cd34.ef5.ps1
+OK 100110 attendu ignoré | 7\pwsh.exe -> Windows\Temp\__PSScriptPolicyTest_abcd1234.x1y.ps1
+OK 100110 attendu alerte | v1.0\powershell.exe -> Local\Temp\payload.ps1
+OK 100110 attendu alerte | v1.0\powershell.exe -> Local\MyTemp\__PSScriptPolicyTest_ab12cd34.ef5.ps1
+OK 100110 attendu alerte | Downloads\evil.exe -> Local\Temp\__PSScriptPolicyTest_5okk3jef.uw0.ps1
+OK 100110 attendu alerte | System32\sdiagnhost.exe -> Windows\Temp\__PSScriptPolicyTest_ab12cd34.ef5.ps1
+OK 100111 attendu ignoré | Update\OneDriveSetup.exe -> OneDrive\26.183.0920.0005\CollectSyncLogs.bat
+OK 100111 attendu ignoré | Update\OneDriveSetup.exe -> images\darkTheme\fre_done.js
+OK 100111 attendu alerte | Update\OneDriveSetup.exe -> Local\Temp\run.ps1
+OK 100111 attendu alerte | Downloads\OneDriveSetup.exe -> OneDrive\26.183.0920.0005\x.js
+TOUS LES TESTS PASSENT
+# SHA-256 de soclab_rules.xml à déployer : 62942369af94c5c355016e9e7eda4320d066eb5685ae4f4e15e5ada3dd764cbb
+
+# --- Déploiement ---
+# 1er essai (16:10) : mauvais fichier copié (test_soclab_rules.py renommé en soclab_rules.xml).
+a318615a913dd379076ace532b82192212de54830adc54a3dc1fadc0a3010b8b  /var/ossec/etc/rules/soclab_rules.xml
+2026/10/17 16:10:35 wazuh-analysisd: ERROR: rules_op: Invalid root element "r".Only "group" is allowed
+2026/10/17 16:10:35 wazuh-analysisd: CRITICAL: (1220): Error loading the rules: 'etc/rules/soclab_rules.xml'.
+# => empreinte différente de celle attendue, et wazuh-analysisd -t en échec : le manager n'a PAS été
+#    redémarré (chaîne &&). Mais le fichier sur disque était invalide : un redémarrage aurait arrêté Wazuh.
+# Correction : contrôle d'empreinte placé AVANT l'installation (sha256sum -c), copie de sauvegarde.
+
+# 2e essai (16:13) :
+# F=/home/user/soclab_rules.xml; echo "62942369...764cbb  $F" | sha256sum -c && cp -p ... /root/soclab_rules.xml.bak
+#   && mv $F /var/ossec/etc/rules/ && chown root:wazuh ... && chmod 660 ... && wazuh-analysisd -t && systemctl restart wazuh-manager
+/home/user/soclab_rules.xml: Réussi
+active
+16:13
+
+# --- Vérification "après" (2026-10-18) ---
+# (VM) alertes PSScriptPolicyTest / OneDrive / règles locales, archive du 17/10 + alerts.json du 18/10
+1085 | 17/10 avant 16:13 | OneDrive | 92200 | OneDriveSetup.exe
+9 | 17/10 avant 16:13 | PSScriptPolicyTest | 92201 | powershell.exe
+11 | 17/10 avant 16:13 | PSScriptPolicyTest | 92205 | powershell.exe
+3 | 17/10 avant 16:13 | PSScriptPolicyTest | 92213 | powershell.exe
+1 | 17/10 avant 16:13 | PSScriptPolicyTest | 92213 | sdiagnhost.exe
+2 | 17/10 avant 16:13 | regle locale | 100100 | nltest.exe
+# => aucune alerte PSScriptPolicyTest ni OneDrive après le déploiement (16:13).
+
+# Contre-vérification 1 : l'agent ws01 (001) envoyait bien des alertes pendant ce temps
+{'17/10 avant 16:13': 1600, '17/10 apres 16:13': 310, '18/10 depuis 00:00': 184}
+
+# Contre-vérification 2 : les fichiers ont bien été créés (ws01, Sysmon événement 11, depuis le 17/10 16:13)
+18/10 00:11:37  powershell.exe  C:\Users\Administrateur\AppData\Local\Temp\__PSScriptPolicyTest_z1t42kxf.tnr.ps1
+18/10 00:05:43  PowerShell.exe  C:\Users\j.martin\AppData\Local\Temp\__PSScriptPolicyTest_3m0agmic.kay.ps1
+18/10 00:04:24  powershell.exe  C:\Windows\SystemTemp\__PSScriptPolicyTest_d3z35q3e.ze5.psm1
+18/10 00:04:24  powershell.exe  C:\Windows\SystemTemp\__PSScriptPolicyTest_ja1sa4gr.slh.ps1
+[... 9 autres paires .ps1/.psm1 dans C:\Windows\SystemTemp entre 00:04:08 et 00:04:23 ...]
+18/10 00:04:08  powershell.exe  C:\Windows\SystemTemp\__PSScriptPolicyTest_kke2kwxo.v4e.psm1
+18/10 00:04:08  powershell.exe  C:\Windows\SystemTemp\__PSScriptPolicyTest_m5ud2ryr.t4c.ps1
+18/10 00:02:42  powershell.exe  C:\Users\j.martin\AppData\Local\Temp\__PSScriptPolicyTest_yzkb3vzy.kgu.ps1
+18/10 00:02:31  powershell.exe  C:\Users\j.martin\AppData\Local\Temp\__PSScriptPolicyTest_ahzsx2oc.rzu.ps1
+
+# Bilan :
+# - 26 fichiers __PSScriptPolicyTest créés entre 00:02 et 00:11 (14 .ps1, 12 .psm1), agent actif, 0 alerte.
+#   Les événements existent et arrivent au manager : c'est la règle 100110 qui écarte les .ps1.
+# - Les 12 .psm1 (rafale système de 00:04) ne déclenchaient aucune règle par défaut : rien à filtrer.
+#   Limite : si une règle future relève les .psm1, élargir 100110 (extension ps1 -> psm?1).
+# - "PowerShell.exe" avec majuscules (00:05:43) : couvert par (?i).
+# - Entre le 17/10 16:13 et minuit, aucune création de ce fichier : la preuve repose sur la fenêtre du 18/10.
+# - OneDrive (100111) : aucune mise à jour depuis le déploiement ; efficacité à confirmer sur la durée.
+# - Parent du PowerShell 32 bits (SYSTEM) : non vérifié à ce stade (hypothèse : agent Wazuh).

@@ -1,0 +1,146 @@
+# 2026-10-16 — ws01 + VM Wazuh (109) — test de la chaîne Sysmon -> agent -> règle Wazuh -> alerte
+# Activité de reconnaissance bénigne, lancée par l'utilisateur standard du domaine (compte "compromis").
+
+# (ws01, session SOCLAB\j.martin, PowerShell non élevé, via RDP)
+# whoami /all; net user /domain; net group "Domain Admins" /domain; nltest /dclist:soclab.internal;
+# schtasks /create /tn "S03-test" /tr "notepad.exe" /sc once /st 23:59; schtasks /delete /tn "S03-test" /f; Get-Date
+soclab\j.martin   S-1-5-21-4294357086-4240531528-2017793516-1103
+[... groupes et privilèges : utilisateur standard, niveau d'intégrité moyen ...]
+comptes d'utilisateurs de \\dc01.soclab.internal
+Administrateur           Invité                   j.martin
+krbtgt
+Le nom de groupe est introuvable.                       <- net group "Domain Admins" : AD en français ("Admins du domaine")
+    dc01.soclab.internal [PDC]  [DS] Site : Default-First-Site-Name
+Opération réussie : la tâche planifiée "S03-test" a été créée.
+Opération réussie : la tâche planifiée "S03-test" a été  supprimée.
+vendredi 16 octobre 2026 23:37:19
+
+# --- Ce que Sysmon a journalisé (événement 1, création de processus) ---
+# (ws01, PowerShell administrateur)
+# Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Sysmon/Operational'; Id=1;
+#   StartTime=(Get-Date '16/10/2026 23:36'); EndTime=(Get-Date '16/10/2026 23:39')} |
+#   ForEach-Object { '{0:HH:mm:ss}  {1}' -f $_.TimeCreated, $_.Properties[10].Value }
+23:38:50  "C:\Program Files (x86)\Microsoft\EdgeUpdate\MicrosoftEdgeUpdate.exe" /ua /installsource scheduler
+23:37:45  C:\Users\j.martin\AppData\Local\Microsoft\OneDrive\Update\OneDriveSetup.exe /update /restart /updateSource:ODU [...]
+23:37:42  "C:\Users\j.martin\AppData\Local\Microsoft\OneDrive\Update\OneDriveSetup.exe" /update /restart /updateSource:ODU /installcodec:8.1.2
+23:37:18  "C:\WINDOWS\system32\schtasks.exe" /delete /tn S03-test /f
+23:37:18  "C:\WINDOWS\system32\schtasks.exe" /create /tn S03-test /tr notepad.exe /sc once /st 23:59
+23:37:16  C:\WINDOWS\system32\net1 group "Domain Admins" /domain
+23:37:16  "C:\WINDOWS\system32\net.exe" group "Domain Admins" /domain
+23:37:16  C:\WINDOWS\system32\net1 user /domain
+23:37:16  "C:\WINDOWS\system32\net.exe" user /domain
+23:37:15  "C:\WINDOWS\system32\whoami.exe" /all
+23:37:07  "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --type=crashpad-handler [...]
+23:36:44  C:\WINDOWS\system32\svchost.exe -k LocalServiceNetworkRestricted -p -s WFDSConMgrSvc
+23:36:32  C:\WINDOWS\system32\svchost.exe -k LocalService -p -s SstpSvc
+23:36:29  C:\WINDOWS\system32\svchost.exe -k LocalService -p -s NPSMSvc
+23:36:20  "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --no-startup-window --win-session-start
+23:36:07  "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+
+# Recherche de nltest sur 24 h :
+# Get-WinEvent ... Id=1; StartTime=(Get-Date).AddDays(-1)} | Where-Object { $_.Properties[10].Value -match 'nltest' } | ...
+23:35:48  whoami  /all; net user /domain; net group "Domain Admins" /domain; nltest /dclist:soclab.internal; [...]
+# => seule occurrence : un premier essai de la ligne entière à 23:35:48 (whoami recevant toute la ligne en
+#    arguments, collée hors de PowerShell). nltest.exe lui-même, exécuté à ~23:37:17, n'a AUCUN événement 1.
+
+# --- Ce que Wazuh a alerté ---
+# (VM Wazuh) le fichier du jour a été archivé à minuit : lecture de /var/ossec/logs/alerts/2026/Oct/ossec-alerts-16.json.gz
+# script Python : alertes de l'agent 001 entre 23:36 et 23:38 (heure, rule.id, niveau, MITRE, description | commandLine ou fichier)
+23:36:03 60106 3 T1078 Windows Logon Success |
+23:36:27 92213 15 T1105 Executable file dropped in folder commonly used by malw | C:\\Users\\j.martin\\AppData\\Local\\Temp\\__PSScriptPolicyTest_5okk3jef.uw0.ps1
+23:36:27 61104 3  Service startup type was changed |
+23:36:45 60106 3 T1078 Windows Logon Success |
+23:37:18 92039 3 T1087 A net.exe account discovery command was initiated | \"C:\\WINDOWS\\system32\\net.exe\" user /domain
+23:37:18 92039 3 T1087 A net.exe account discovery command was initiated | C:\\WINDOWS\\system32\\net1 user /domain
+23:37:18 92031 3 T1087 Discovery activity executed | \"C:\\WINDOWS\\system32\\net.exe\" group \"Domain Admins\" /domain
+23:37:19 92031 3 T1087 Discovery activity executed | C:\\WINDOWS\\system32\\net1 group \"Domain Admins\" /domain
+23:37:20 92154 4 T1053.005 Process loaded taskschd.dll module. May be used to crea |
+23:37:20 92154 4 T1053.005 Process loaded taskschd.dll module. May be used to crea |
+23:38:50 92200 6 T1059,T1105 Scripting file created under Windows Temp or User folde | C:\\Users\\j.martin\\AppData\\Local\\Microsoft\\OneDrive\\26.183.0920.0005\\Coll
+23:38:50 92200 6 T1059,T1105 Scripting file created under Windows Temp or User folde | C:\\Users\\j.martin\\AppData\\Local\\Microsoft\\OneDrive\\26.183.0920.0005\\Coll
+23:38:50 92200 6 T1059,T1105 Scripting file created under Windows Temp or User folde | C:\\Users\\j.martin\\AppData\\Local\\Microsoft\\OneDrive\\26.183.0920.0005\\Erro
+23:38:52 92200 6 T1059,T1105 Scripting file created under Windows Temp or User folde | C:\\Users\\j.martin\\AppData\\Local\\Microsoft\\OneDrive\\26.183.0920.0005\\Lott
+
+# Origine des 2 170 alertes 92200 de la journée (champ image) :
+[('C:\\Users\\labadmin\\AppData\\Local\\Microsoft\\OneDrive\\Update\\OneDriveSetup.exe', 1085),
+ ('C:\\Users\\j.martin\\AppData\\Local\\Microsoft\\OneDrive\\Update\\OneDriveSetup.exe', 1085)]
+23:27:32 C:\\Users\\labadmin\\AppData\\Local\\Microsoft\\OneDrive\\26.183.0920.0005\\CollectSyncLogs.bat
+23:27:32 C:\\Users\\labadmin\\AppData\\Local\\Microsoft\\OneDrive\\26.183.0920.0005\\CollectSyncLogsLite.bat
+23:27:32 C:\\Users\\labadmin\\AppData\\Local\\Microsoft\\OneDrive\\26.183.0920.0005\\ErrorPage.js
+23:27:33 C:\\Users\\labadmin\\AppData\\Local\\Microsoft\\OneDrive\\26.183.0920.0005\\Lottie.min.js
+[...]
+# Lignes JSON illisibles dans l'archive du 16/10 : 1 (ignorée)
+
+# --- Bilan ---
+# commande                              Sysmon (ID 1)  Alerte Wazuh
+# whoami /all                           oui            non
+# net user /domain                      oui            oui  92039 niv. 3 (T1087)
+# net group "Domain Admins" /domain     oui            oui  92031 niv. 3 (T1087) — alors que la commande a échoué
+# nltest /dclist:soclab.internal        NON            non
+# schtasks /create                      oui            indirect : 92154 niv. 4 (chargement de taskschd.dll, sans ligne de commande)
+# schtasks /delete                      oui            indirect : 92154 niv. 4
+#
+# Constats :
+# - Sysmon : 5 commandes sur 6. nltest absent : à expliquer (exclusion dans la config sysmon-modular ?).
+# - Wazuh : 2 commandes sur 6 alertées explicitement, 2 indirectement, 2 pas du tout.
+# - Toute la reconnaissance est en niveau 3-4 : invisible pour un analyste qui filtre à partir du niveau 7.
+# - L'alerte la plus grave de la fenêtre (92213, niveau 15, le maximum) est un faux positif : le fichier
+#   __PSScriptPolicyTest_*.ps1 que PowerShell crée dans Temp à chaque lancement.
+# - 100 % des 2 170 alertes 92200 du jour viennent de la mise à jour de OneDrive (OneDriveSetup.exe), une
+#   fois par profil (labadmin, j.martin) : bruit pur, à filtrer.
+# - Les rafales du dashboard (~23:27 et ~23:39) sont les mises à jour OneDrive des deux profils.
+
+# --- 2026-10-17 — cause de l'angle mort nltest ---
+# (ws01) & "$env:windir\Sysmon64.exe" -c | Select-String -Pattern 'nltest' -Context 3
+#   (aucune sortie)
+# Règles de configs/sysmon/sysmonconfig-15.21.xml (événement 1, listes d'inclusion) visant nltest :
+#   l.3538  OriginalFileName contains any  nltest.exe;nltestk.exe              (T1033)
+#   l.3590  OriginalFileName is nltestrk.exe  ET  CommandLine contains /domain_trusts  (T1482)
+#   l.3594  OriginalFileName is nltest.exe                                     (T1482)
+# (ws01, PowerShell administrateur)
+# (Get-Item C:\Windows\System32\nltest.exe).VersionInfo.OriginalFilename; nltest /dclist:soclab.internal | Out-Null;
+# nltest /domain_trusts | Out-Null; Start-Sleep 3; Get-WinEvent ... Id=1 ... | Where-Object { ... -match 'nltest' } | ...
+nltestrk.exe.mui
+14:42:46  "C:\WINDOWS\system32\nltest.exe" /domain_trusts  [technique_id=T1482,technique_name=Domain Trust Discovery]
+
+# => confirmé : le nom d'origine de nltest.exe est nltestrk.exe. Aucune règle ne le couvre hors /domain_trusts
+#    ("nltestk.exe" en l.3538 ressemble à une coquille pour "nltestrk.exe") : nltest /dclist (T1018) n'est
+#    jamais journalisé avec la config sysmon-modular 15.21.
+
+# --- 2026-10-17 — correction : configs/sysmon/sysmonconfig-15.21-lab.xml ---
+# Ajout d'une règle événement 1 : OriginalFileName is nltestrk.exe (T1018). SHA-256 du fichier :
+# 63BCB62D2D1933F02F0A2F5C4CBA9B59DB81EAD33A26A332FDF2241227E36694 (vérifié avant chargement sur chaque machine)
+# (ws01, admin) fichier copié via le presse-papiers RDP dans C:\Users\Public\, puis :
+#   if ((Get-FileHash $f).Hash -ne $h) { 'EMPREINTE KO - arret' } else { & "$env:windir\Sysmon64.exe" -c $f }
+# (ws01 -> dc01, PowerShell à distance, SOCLAB\Administrateur) Copy-Item -ToSession, même contrôle, Sysmon64 -c :
+Loading configuration file with schema version 4.91
+Configuration file validated.
+Configuration updated.
+#   ("NativeCommandError" affiché avant : bannière de Sysmon écrite sur stderr, remontée par le remoting ; sans gravité)
+
+# (ws01, admin) nltest /dclist:soclab.internal | Out-Null; Start-Sleep 3; Get-WinEvent ... Id=1 ... -match 'nltest' ...
+15:19:41  "C:\WINDOWS\system32\nltest.exe" /dclist:soclab.internal  [technique_id=T1018,technique_name=Remote System Discovery]
+
+# => nltest /dclist désormais journalisé par Sysmon, avec la technique T1018.
+
+# (VM Wazuh) alertes de l'agent 001 du 17/10 contenant "nltest" (alerts.json, script Python)
+#   (aucune sortie)
+# => Wazuh reçoit l'événement Sysmon (canal collecté par le groupe windows) mais aucune règle par défaut ne
+#    relève nltest, ni /dclist (15:19:41) ni /domain_trusts (14:42:46) : règle locale nécessaire.
+
+# --- 2026-10-17 — règle locale Wazuh 100100 (configs/wazuh/rules/soclab_rules.xml) ---
+# (VM Wazuh) fichier écrit dans /var/ossec/etc/rules/soclab_rules.xml, puis :
+# chown root:wazuh ... && chmod 660 ... && sha256sum ... && /var/ossec/bin/wazuh-analysisd -t && systemctl restart wazuh-manager && systemctl is-active wazuh-manager
+0bcecb607a236ef8470531aaa9bb78c2393a203e694e4a36e87e884c590faefe  /var/ossec/etc/rules/soclab_rules.xml
+active
+# => empreinte identique au fichier du dépôt ; config validée par wazuh-analysisd -t avant redémarrage.
+
+# (ws01, PowerShell administrateur du domaine) nltest /dclist:soclab.internal | Out-Null; nltest /domain_trusts | Out-Null
+# (VM Wazuh) alertes de la règle 100100 dans alerts.json (script Python)
+15:28:56 ws01 8 ['T1018', 'T1482'] Reconnaissance AD : nltest exécuté par SOCLAB\Administrateur : \"C:\WINDOWS\system32\nltest.exe\" /dclist:soclab.internal
+15:28:56 ws01 8 ['T1018', 'T1482'] Reconnaissance AD : nltest exécuté par SOCLAB\Administrateur : \"C:\WINDOWS\system32\nltest.exe\" /domain_trusts
+
+# => angle mort fermé : nltest (/dclist et /domain_trusts) produit une alerte de niveau 8 avec MITRE et ligne de commande.
+# Remarques :
+# - Test lancé depuis une session administrateur du domaine (et non j.martin) : la règle ne dépend pas de l'utilisateur.
+# - Les \ et \" de la description viennent de l'échappement des champs eventchannel par Wazuh : cosmétique.

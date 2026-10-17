@@ -1,0 +1,150 @@
+# 2026-10-16 — Hôte Proxmox — ajout d'un SSD et création du stockage LVM-thin "ssd"
+# Contexte : le disque de l'hôte (SSHD 5400 tr/min) est le goulot du lab (S1 : IO delay 40-80 % ;
+# s03-01 : indexer Wazuh démarré en 274 s). Ajout d'un SSD SATA Kingston A400 480 Go sur un port SATA libre
+# (la carte mère MSI H310M PRO-VDH PLUS n'a pas de slot M.2).
+
+# (hôte) dmidecode -t baseboard | grep -E 'Manufacturer|Product'
+        Manufacturer: Micro-Star International Co., Ltd.
+        Product Name: H310M PRO-VDH PLUS (MS-7C09)
+
+# (hôte) lsblk -o NAME,MODEL,SIZE,MOUNTPOINT /dev/sdb; ls -l /dev/disk/by-id/ | grep -i kingston
+NAME   MODEL                   SIZE MOUNTPOINT
+sdb    KINGSTON SA400S37480G 447.1G
+├─sdb1                         300M
+└─sdb2                       446.8G
+lrwxrwxrwx 1 root root  9 Oct 16 20:52 ata-KINGSTON_SA400S37480G_50026B738105A41F -> ../../sdb
+# => ancien Linux sur le SSD, aucune partition montée : effacement sans risque.
+
+# (hôte) D=/dev/disk/by-id/ata-KINGSTON_SA400S37480G_50026B738105A41F
+#        wipefs -a ${D}-part1 ${D}-part2; sgdisk --zap-all $D; wipefs -a $D
+...-part1: 8 bytes were erased at offset 0x00000052 (vfat): 46 41 54 33 32 20 20 20
+...-part1: 1 byte was erased at offset 0x00000000 (vfat): eb
+...-part1: 2 bytes were erased at offset 0x000001fe (vfat): 55 aa
+...-part2: 2 bytes were erased at offset 0x00000438 (ext4): 53 ef
+GPT data structures destroyed! You may now partition the disk using fdisk or
+other utilities.
+
+# (hôte) pvcreate $D && vgcreate ssd $D && lvcreate -l 95%FREE --thinpool data ssd \
+#        && pvesm add lvmthin ssd --vgname ssd --thinpool data --content images,rootdir
+  Physical volume "/dev/disk/by-id/ata-KINGSTON_SA400S37480G_50026B738105A41F" successfully created.
+  Volume group "ssd" successfully created
+  Thin pool volume with chunk size 256.00 KiB can address at most 63.50 TiB of data.
+  Logical volume "data" created.
+
+# (hôte) pvesm status; lvs ssd
+Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
+local             dir     active        98497780        33878176        59570056   34.39%
+local-lvm     lvmthin     active       354275328       266237908        88037419   75.15%
+ssd           lvmthin     active       445181952               0       445181952    0.00%
+  LV   VG  Attr       LSize    Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data ssd twi-a-tz-- <424.56g             0.00   10.42
+
+# Constats :
+# - Disque désigné par /dev/disk/by-id (stable) plutôt que /dev/sdb (peut changer au reboot).
+# - Thin pool sur 95 % du VG : 5 % laissés libres pour l'extension des métadonnées.
+# - local-lvm (SSHD) déjà rempli à 75 % : la migration des VM du projet le soulagera aussi.
+
+# --- Migration des disques des VM du projet vers "ssd" ---
+# Pas de vzdump : "local" est sur le même disque (sda) que local-lvm, donc aucune protection en plus.
+# Filet de sécurité : qm disk move conserve les disques d'origine (unusedN) et leurs snapshots
+# s01-base / s02-domaine sur local-lvm. VM éteintes (TPM non déplaçable à chaud, cohérence du DC).
+
+# (hôte) qm shutdown 121 && qm shutdown 120 && qm shutdown 109
+# (hôte) for d in "109 scsi0" "120 efidisk0" "120 scsi0" "121 efidisk0" "121 scsi0" "121 tpmstate0"; do
+#          qm disk move $d ssd || break; done
+
+# (hôte) for id in 109 120 121; do qm config $id | grep -E '^(scsi|efidisk|tpmstate|unused)[0-9]'; done; lvs ssd
+== 109
+scsi0: ssd:vm-109-disk-0,cache=writeback,discard=on,iothread=1,size=42G
+unused0: local-lvm:vm-109-disk-0
+== 120
+efidisk0: ssd:vm-120-disk-0,efitype=4m,ms-cert=2023k,pre-enrolled-keys=1,size=4M
+scsi0: ssd:vm-120-disk-1,discard=on,iothread=1,size=40G
+unused0: local-lvm:vm-120-disk-0
+unused1: local-lvm:vm-120-disk-1
+== 121
+efidisk0: ssd:vm-121-disk-0,efitype=4m,ms-cert=2023k,pre-enrolled-keys=1,size=4M
+scsi0: ssd:vm-121-disk-1,discard=on,iothread=1,size=64G
+tpmstate0: ssd:vm-121-disk-2,size=4M,version=v2.0
+unused0: local-lvm:vm-121-disk-0
+unused1: local-lvm:vm-121-disk-1
+unused2: local-lvm:vm-121-disk-2
+  LV            VG  Attr       LSize    Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data          ssd twi-aotz-- <424.56g             17.19  14.82
+  vm-109-disk-0 ssd Vwi-a-tz--   42.00g data        88.68
+  vm-120-disk-0 ssd Vwi-a-tz--    4.00m data        18.75
+  vm-120-disk-1 ssd Vwi-a-tz--   40.00g data        21.31
+  vm-121-disk-0 ssd Vwi-a-tz--    4.00m data        18.75
+  vm-121-disk-1 ssd Vwi-a-tz--   64.00g data        42.54
+  vm-121-disk-2 ssd Vwi-a-tz--    4.00m data        6.25
+
+# Constats :
+# - Les 6 disques actifs sont sur "ssd" ; les originaux restent en unusedN sur local-lvm (retour arrière possible).
+# - Pool "ssd" à 17 % après migration.
+# - vm-109-disk-0 occupe 88,7 % alors que le système de fichiers de Wazuh était à 56 % (S1) : la copie a
+#   réécrit des blocs libérés. discard=on est actif, un fstrim dans la VM les rendra au pool.
+
+# --- Mesure A : démarrage de Wazuh seul sur SSD (dc01 et ws01 éteints) ---
+# (hôte) qm start 109   puis ~2 min d'attente
+# (VM)   systemctl is-active wazuh-indexer wazuh-manager wazuh-dashboard; systemd-analyze blame | grep wazuh; fstrim -av
+active
+active
+active
+18.454s wazuh-manager.service
+16.638s wazuh-indexer.service
+/ : 5,6 GiB (6042402816 octets) réduits sur /dev/sda1
+
+# => indexer 58,6 s (S1, SSHD, s01-14) -> 16,6 s ; manager 37,9 s -> 18,5 s.
+# => fstrim : 5,6 Gio de blocs libérés rendus au pool "ssd".
+
+# --- Mesure B : redémarrage de Wazuh avec dc01 et ws01 en marche (mêmes conditions que s03-01) ---
+# (hôte) qm start 120 && sleep 60 && qm start 121   puis ~2 min d'attente
+# (hôte) qm reboot 109
+# (VM)   systemd-analyze blame | grep wazuh; uptime; /var/ossec/bin/agent_control -l
+19.423s wazuh-manager.service
+19.373s wazuh-indexer.service
+ 23:27:49 up 1 min,  1 user,  load average: 3,16, 1,06, 0,38
+
+Wazuh agent_control. List of available agents:
+   ID: 000, Name: WAZUH (server), IP: 127.0.0.1, Active/Local
+   ID: 001, Name: ws01, IP: any, Active
+   ID: 002, Name: dc01, IP: any, Active
+
+# Bilan SSHD -> SSD :
+#                                   SSHD            SSD
+#   indexer, Wazuh seul             58,6 s (s01-14)  16,6 s
+#   indexer, Windows en marche     274 s  (s03-01)  19,4 s
+#   load average au démarrage      10,76  (s03-01)   3,16
+# => avec les Windows en marche, démarrage ~14x plus rapide ; le délai systemd de 600 s n'est plus
+#    qu'un garde-fou. Les 2 agents se reconnectent en moins d'une minute.
+
+# --- Snapshot s03-ssd : nouveau point de retour, VM du projet sur SSD ---
+# (hôte) for id in 109 120 121; do qm snapshot $id s03-ssd --description "VM du projet sur SSD"; done
+skipping guest filesystem freeze - disabled in VM options
+snapshotting 'drive-scsi0' (ssd:vm-109-disk-0)
+  Logical volume "snap_vm-109-disk-0_s03-ssd" created.
+freeze guest filesystem
+snapshotting 'drive-scsi0' (ssd:vm-120-disk-1)
+  Logical volume "snap_vm-120-disk-1_s03-ssd" created.
+snapshotting 'drive-efidisk0' (ssd:vm-120-disk-0)
+  Logical volume "snap_vm-120-disk-0_s03-ssd" created.
+thaw guest filesystem
+freeze guest filesystem
+snapshotting 'drive-scsi0' (ssd:vm-121-disk-1)
+  Logical volume "snap_vm-121-disk-1_s03-ssd" created.
+snapshotting 'drive-efidisk0' (ssd:vm-121-disk-0)
+  Logical volume "snap_vm-121-disk-0_s03-ssd" created.
+snapshotting 'drive-tpmstate0' (ssd:vm-121-disk-2)
+  Logical volume "snap_vm-121-disk-2_s03-ssd" created.
+thaw guest filesystem
+
+# Constats :
+# - Snapshots pris VM allumées, sans état de la RAM : cohérents au niveau disque.
+# - dc01 : gel/dégel VSS sans erreur, alors qu'en S1 le dégel dépassait le délai de l'agent QEMU (disque lent).
+# - wazuh : gel du système de fichiers désactivé dans les options de la VM (agent QEMU sans freeze-fs).
+
+# --- État SMART du SSD (interface Proxmox, nœud > Disques) ---
+# capture : docs/screenshots/s03-proxmox-disques-ssd.png
+# /dev/sdb  SSD  LVM  480.10 GB  KINGSTON_SA400S37480G  S.M.A.R.T. PASSED  Wearout 21%
+# Constat : SSD de récupération (non neuf), 21 % de son endurance déjà consommée. Suffisant pour le lab,
+# mais à surveiller (smartctl -a /dev/disk/by-id/ata-KINGSTON_SA400S37480G_50026B738105A41F).

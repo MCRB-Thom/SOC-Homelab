@@ -25,3 +25,14 @@ Nommage : `sNN-<sujet>.png`.
 |---|---|
 | `s02-dc01-domaine.png` | Domaine `soclab.internal` opérationnel (AD DS, DNS, Netlogon) |
 | `s02-ws01-domaine.png` | Session d'un utilisateur du domaine sur `ws01` |
+
+## Semaine 3
+
+| Fichier | Contenu |
+|---|---|
+| `s03-proxmox-disques-ssd.png` | Disques de l'hôte : SSHD d'origine (`sda`) et SSD Kingston A400 (`sdb`, LVM) |
+| `s03-wazuh-ws01-derniere-heure.png` | Alertes de `ws01` sur une heure : deux rafales (~23:27 et ~23:39) : mises à jour OneDrive des profils labadmin et j.martin |
+| `s03-wazuh-rafale-92200.png` | Détail de la rafale de 23:39 : ~1 000 alertes 92200 « Scripting file created » en ~20 s, toutes dues à `OneDriveSetup.exe` |
+| `s03-wazuh-discovery-92031.png` | Règle 92031 « Discovery activity executed » sur `ws01` (24 h) : 2 alertes pendant le test de 23:37 |
+| `s03-wazuh-regle-100100-liste.png` | Règle locale 100100 : 2 alertes de niveau 8 pour `nltest /dclist` et `/domain_trusts` |
+| `s03-wazuh-regle-100100-detail.png` | Détail d'une alerte 100100 : MITRE T1018 + T1482 (tactique Discovery), groupes `soclab`, événement Sysmon d'origine (`full_log`) |

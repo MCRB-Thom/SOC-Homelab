@@ -3,4 +3,7 @@
 *.conf text eol=lf
 *.interfaces text eol=lf
 *.sh text eol=lf
+configs/wazuh/**/*.xml text eol=lf
 *.png binary
+# config Sysmon du lab : octets conservés tels quels (empreinte SHA-256 stable entre clones)
+configs/sysmon/sysmonconfig-*-lab.xml -text

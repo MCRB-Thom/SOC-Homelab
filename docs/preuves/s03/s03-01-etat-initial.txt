@@ -1,0 +1,68 @@
+# 2026-10-16 — Hôte Proxmox + VM Wazuh (109) — état initial avant la semaine 3
+# (après changement de PC d'administration : dépôt recloné depuis GitHub, lab inchangé)
+
+# (hôte) qm list   — avant le passage de Wazuh à 6 Go (VM hors périmètre omises, toutes stopped)
+      VMID NAME                 STATUS     MEM(MB)    BOOTDISK(GB) PID
+       109 Wazuh                running    5120              42.00 35853
+       120 dc01                 running    2048              40.00 35992
+       121 ws01                 running    4096              64.00 36073
+
+# (hôte) for id in 109 120 121; do qm listsnapshot $id; done
+# => snapshots s01-base et s02-domaine présents sur les 3 VM.
+
+# (VM) systemctl is-active wazuh-indexer wazuh-manager wazuh-dashboard suricata   — 16:04, ~4 min après le boot
+activating
+inactive
+active
+inactive
+
+# (VM) uptime; systemctl list-jobs; journalctl -u wazuh-indexer -b | grep systemd
+ 16:10:22 up 10 min,  1 user,  load average: 10,76, 6,79, 3,20
+No jobs running.
+oct. 16 16:01:15 WAZUH systemd[1]: Starting wazuh-indexer.service - wazuh-indexer...
+oct. 16 16:05:49 WAZUH systemd[1]: Started wazuh-indexer.service - wazuh-indexer.
+
+# (VM) systemctl is-active wazuh-indexer wazuh-manager wazuh-dashboard; systemctl status wazuh-manager | head -8
+active
+active
+active
+● wazuh-manager.service - Wazuh manager
+     Loaded: loaded (/lib/systemd/system/wazuh-manager.service; enabled; preset: enabled)
+    Drop-In: /etc/systemd/system/wazuh-manager.service.d
+             └─override.conf
+     Active: active (running) since Fri 2026-10-16 16:06:44 CEST; 4min 32s ago
+    Process: 840 ExecStart=/usr/bin/env /var/ossec/bin/wazuh-control start (code=exited, status=0/SUCCESS)
+      Tasks: 225 (limit: 7047)
+     Memory: 1.3G
+
+# (VM) /var/ossec/bin/agent_control -l
+Wazuh agent_control. List of available agents:
+   ID: 000, Name: WAZUH (server), IP: 127.0.0.1, Active/Local
+   ID: 001, Name: ws01, IP: any, Active
+   ID: 002, Name: dc01, IP: any, Active
+
+# (VM) free -h
+               total       utilisé      libre     partagé tamp/cache   disponible
+Mem:           5,8Gi       3,4Gi       1,3Gi       752Ki       1,4Gi       2,4Gi
+Échange:       974Mi          0B       974Mi
+
+# (hôte) RAM de Wazuh portée de 5 à 6 Go, puis redémarrage de la VM 109 seule (~16:00)
+# (hôte) qm config 109 | grep -E '^(memory|balloon)'; qm list
+memory: 6144
+      VMID NAME                 STATUS     MEM(MB)    BOOTDISK(GB) PID
+       109 Wazuh                running    6144              42.00 43958
+       120 dc01                 running    2048              40.00 35992
+       121 ws01                 running    4096              64.00 36073
+
+# Constats :
+# - Lab intact : 3 VM du projet en marche, snapshots présents, Suricata toujours arrêté (prévu jusqu'en S4).
+# - VM Wazuh passée de 5 à 6 Go ; le système invité voit 5,8 Gio.
+#   Seule la VM 109 a redémarré (nouveau PID) ; dc01 et ws01 ont continué de tourner.
+# - Les 2 agents (ws01, dc01) se reconnectent seuls après le redémarrage du manager.
+# - Démarrage de l'indexer : 274 s (16:01:15 → 16:05:49) contre 59 s mesurées en S1 (s01-14).
+#   Ici dc01 et ws01 tournaient et sollicitaient déjà le disque SSHD :
+#   load 10,76 sur 2 vCPU = attente disque. Le drop-in TimeoutStartSec=600 (s01-13) a évité l'échec,
+#   avec ~5 min de marge.
+#   => redémarrer Wazuh avec les Windows éteints, ou démarrer les VM de façon échelonnée
+#      (wazuh, puis dc01, puis ws01).
+# - Manager démarré 55 s après l'indexer (ordre After= respecté). Pas de swap, 2,4 Gio disponibles.

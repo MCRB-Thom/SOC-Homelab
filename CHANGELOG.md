@@ -4,6 +4,26 @@ Format : une entrée par session de travail, la plus récente en haut.
 Chaque entrée indique ce qui a changé dans le lab, pourquoi, et la preuve
 (`docs/preuves/`, `docs/screenshots/`).
 
+## 2026-10-16 → 18 — Semaine 3 : reprise, SSD, test de détection, angle mort nltest, réglage du bruit
+
+### Fait
+- Changement de PC d'administration : dépôt recloné depuis GitHub. Le lab (Proxmox) n'a pas bougé : 109, 120 et 121 en marche, snapshots `s01-base` et `s02-domaine` présents, agents `ws01` et `dc01` actifs (`docs/preuves/s03/s03-01-etat-initial.txt`).
+- RAM de la VM Wazuh portée de 5 à 6 Go (redémarrage de la VM 109 seule) : `docs/architecture.md` mis à jour, budget RAM à ~14 Go, marge ~2 Go.
+- SSD Kingston A400 480 Go ajouté sur un port SATA libre (pas de slot M.2 sur la carte mère) : stockage lvm-thin `ssd`, disques de 109, 120 et 121 déplacés VM éteintes. Les disques d'origine restent en `unusedN` sur `local-lvm`, avec leurs snapshots, comme point de retour. `fstrim` dans Wazuh : 5,6 Gio rendus au pool (`docs/preuves/s03/s03-02-ssd.txt`).
+- Résultat : indexer Wazuh démarré en 16,6 s seul (58,6 s en S1) et en 19,4 s avec les Windows en marche (274 s avant), load 3,16 au lieu de 10,76.
+- Snapshot `s03-ssd` de 109, 120 et 121 : point de retour sur SSD. Le gel/dégel VSS de `dc01` (en échec de délai en S1) passe sans erreur.
+- Test de la chaîne de détection sur `ws01` (reconnaissance par `j.martin`) : Sysmon journalise 5 commandes sur 6, Wazuh en alerte 2 explicitement (92039, 92031, niveau 3) et 2 indirectement (92154, `taskschd.dll`) (`docs/preuves/s03/s03-03-chaine-detection.txt`).
+- Angle mort `nltest` corrigé. Cause : le nom d'origine de `nltest.exe` est `nltestrk.exe`, que sysmon-modular 15.21 ne couvre qu'avec `/domain_trusts`. Ajout de `configs/sysmon/sysmonconfig-15.21-lab.xml` (règle `nltestrk.exe`, T1018), déployé sur `ws01` et `dc01` après contrôle SHA-256, et de la règle Wazuh locale 100100 niveau 8 (`configs/wazuh/rules/soclab_rules.xml`). `nltest /dclist` et `/domain_trusts` sont maintenant alertés.
+- `.gitattributes` : config Sysmon du lab versionnée sans conversion de fins de ligne ; XML Wazuh forcés en LF.
+- Réglage du bruit : règles Wazuh locales de niveau 0 100110 (fichier `__PSScriptPolicyTest` de PowerShell, sur 92200/92201/92205/92213) et 100111 (mise à jour de OneDrive, sur 92200), testées hors ligne (`configs/wazuh/rules/test_soclab_rules.py`, 13 cas). Vérifié : 26 fichiers créés le 18/10, agent actif, 0 alerte (24 la veille, dont 4 de niveau 15) (`docs/preuves/s03/s03-04-reglage-bruit.txt`).
+- Procédure de déploiement des règles : `sha256sum -c` avant installation, sauvegarde, `wazuh-analysisd -t`, puis redémarrage (un premier essai avec le mauvais fichier a été bloqué par la validation).
+
+### Constat
+- `whoami` journalisé par Sysmon mais sans alerte Wazuh : angle mort restant.
+- La copie versionnée de `sysmonconfig-15.21.xml` ne redonne plus l'empreinte publiée (fins de ligne normalisées par Git).
+- Faux positifs identifiés puis filtrés (ci-dessus) : `__PSScriptPolicyTest` (24 alertes/jour, niveaux 9 à 15, dont 20 venant d'un PowerShell 32 bits lancé par le système, probablement l'agent Wazuh) et mises à jour de OneDrive (1 085 alertes par profil).
+- Avant le SSD, redémarrage de Wazuh avec `dc01` et `ws01` déjà en marche : `wazuh-indexer` met 274 s à démarrer (contre 59 s en S1), avec un load de 10,76 sur 2 vCPU (attente disque). Le délai de 600 s tient. Cause : le SSHD ; résolu par le passage sur SSD (ci-dessus).
+
 ## 2026-10-11 — Semaine 2 : domaine AD, Sysmon, agents Wazuh
 
 ### Fait

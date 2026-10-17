@@ -20,7 +20,7 @@ flowchart LR
 
 | VMID | Nom | OS | vCPU | RAM | Disque | Réseau |
 |---|---|---|---|---|---|---|
-| 109 | Wazuh | Debian 12 (q35, CPU host) | 2 | 8 Go → **5 Go** | 42 Go `local-lvm` | `net0` virtio sur `vmbr0` (firewall=1) |
+| 109 | Wazuh | Debian 12 (q35, CPU host) | 2 | 8 Go → 5 Go → **6 Go** | 42 Go `local-lvm` | `net0` virtio sur `vmbr0` (firewall=1) |
 
 Les autres VM de l'hôte sont d'anciens projets, hors périmètre ; elles restent
 éteintes pendant le lab.
@@ -66,6 +66,10 @@ flowchart TB
   L'interface lab de la VM Wazuh voit donc tout le trafic du lab → Suricata
   peut tourner sur la VM Wazuh, sans VM ni port mirroring dédiés.
 - **Attaquant en LXC** : environ 512 Mo au lieu de 2 à 4 Go pour une VM Kali.
+- **VM du projet sur SSD** (depuis la S3) : disques de `wazuh`, `dc01` et `ws01`
+  sur le stockage lvm-thin `ssd` (Kingston A400 480 Go, SATA). Le SSHD d'origine
+  garde Proxmox, les ISO et les VM hors périmètre. Démarrage de l'indexer avec
+  les Windows en marche : 274 s → 19 s.
 - **LLM hors Proxmox** : le PC portable fait l'inférence (6 Go de VRAM). Pour
   l'évaluation (S7–S8), les alertes sont exportées en JSONL ; pas besoin que le
   PC soit connecté au lab en permanence.
@@ -90,8 +94,8 @@ l'usage privé et évite les conflits mDNS de `.local`.
 | Élément | RAM | vCPU | Notes |
 |---|---|---|---|
 | Hôte Proxmox | ~1,5 Go | — | KSM actif (partage des pages entre les 2 Windows) |
-| wazuh (+ Suricata) | 5 Go | 2 | heap indexer limitée à 2 Go (`jvm.options`) |
+| wazuh (+ Suricata) | 6 Go | 2 | heap indexer limitée à 2 Go (`jvm.options`) ; 5 Go en S1, 6 Go depuis la S3 |
 | dc01 (Server 2022 Core) | 2 Go | 2 | pas d'interface graphique |
 | ws01 (Win11) | 4 Go max / 2 Go min | 2 | ballooning ; 4 Go requis à l'installation |
 | attacker (LXC Debian 12) | 512 Mo | 1 | |
-| **Total** | **~13 Go** | 7 / 6 cœurs | marge ~3 Go |
+| **Total** | **~14 Go** | 7 / 6 cœurs | marge ~2 Go |

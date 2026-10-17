@@ -1,0 +1,61 @@
+<!--
+  Règles locales du SOC-Homelab.
+  Déployé sur la VM Wazuh : /var/ossec/etc/rules/soclab_rules.xml (root:wazuh, 660).
+  Plage d'identifiants réservée aux règles locales : 100000-120000.
+-->
+<group name="soclab,windows,sysmon,">
+
+  <!--
+    S3 : nltest.exe (nom d'origine nltestrk.exe) n'est relevé par aucune règle par défaut.
+    nltest sert à lister les contrôleurs de domaine (/dclist, T1018) ou les relations
+    d'approbation (/domain_trusts, T1482). Rare pour un utilisateur standard : niveau 8,
+    au-dessus du bruit de reconnaissance de niveau 3-4.
+    Nécessite la règle Sysmon locale de configs/sysmon/sysmonconfig-15.21-lab.xml pour /dclist.
+    Preuve : docs/preuves/s03/s03-03-chaine-detection.txt
+  -->
+  <rule id="100100" level="8">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.originalFileName" type="pcre2">(?i)^nltestrk\.exe$</field>
+    <description>Reconnaissance AD : nltest exécuté par $(win.eventdata.user) : $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1018</id>
+      <id>T1482</id>
+    </mitre>
+  </rule>
+
+  <!--
+    Réglage du bruit (S3). Principe : règles enfants de niveau 0 (aucune alerte), qui ne
+    visent qu'un couple précis "programme + fichier créé". Les champs eventchannel contiennent
+    des \\ doublés : chaque séparateur de chemin s'écrit \\\\ en pcre2.
+  -->
+
+  <!--
+    PowerShell crée __PSScriptPolicyTest_xxxxxxxx.xxx.ps1 dans Temp à chaque lancement (test
+    de la politique d'exécution). Selon le contexte, Wazuh lève 92201, 92205 ou 92213 (niveau 15, le
+    maximum), mesuré le 17/10 : 24 alertes en une journée, sans aucune activité malveillante.
+    Dossiers observés : Temp et Temp\<n> (session RDP) du profil, C:\Windows\Temp et
+    C:\Windows\SystemTemp (PowerShell 32 bits lancé par AUTORITE NT\Système : 20 alertes sur 24).
+    Reste détecté : tout autre .ps1 déposé dans Temp, ou ce nom créé par un autre programme.
+  -->
+  <rule id="100110" level="0">
+    <if_sid>92200, 92201, 92205, 92213</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\\\(WindowsPowerShell\\\\v1\.0\\\\powershell(_ise)?|PowerShell\\\\7\\\\pwsh)\.exe$</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\\\\(System)?Temp\\\\(\d+\\\\)?__PSScriptPolicyTest_[a-z0-9]{8}\.[a-z0-9]{3}\.ps1$</field>
+    <description>Bruit connu : fichier de test de politique d'exécution PowerShell</description>
+  </rule>
+
+  <!--
+    La mise à jour de OneDrive (par profil utilisateur) dépose ~1 000 fichiers .js/.bat dans
+    son dossier de version : 2 170 alertes 92200 par jour pour 2 profils.
+    Limite assumée : OneDriveSetup.exe est dans un dossier modifiable par l'utilisateur ; un faux
+    OneDriveSetup.exe placé à cet endroit précis passerait. Le périmètre est donc restreint à ce
+    chemin exact et au dossier de version de OneDrive.
+  -->
+  <rule id="100111" level="0">
+    <if_sid>92200</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)^C:\\\\Users\\\\[^\\]+\\\\AppData\\\\Local\\\\Microsoft\\\\OneDrive\\\\Update\\\\OneDriveSetup\.exe$</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)^C:\\\\Users\\\\[^\\]+\\\\AppData\\\\Local\\\\Microsoft\\\\OneDrive\\\\\d+(\.\d+)+\\\\</field>
+    <description>Bruit connu : fichiers déposés par la mise à jour de OneDrive</description>
+  </rule>
+
+</group>
