@@ -60,5 +60,5 @@ longueur de L : 769
 -rw-r--r--  1 root root 25252382 19 oct.  23:47 stats.log
 -rw-r--r--  1 root root     3631 19 oct.  23:12 suricata.log
 # - eve.json : 39 Mo en ~2 jours (tous les flux, DNS, HTTP... pas seulement les alertes) ; stats.log : 25 Mo.
-#   Rotation quotidienne observée (eve.json.1 le 18/10 00:00), conservation à vérifier.
+#   Rotation observée le 18/10 à 00:00 (eve.json.1) ; fréquence et conservation : voir s04-07 (hebdomadaire, 14).
 # - fast.log et suricata.log modifiés le 19/10 à 23:12 : nouvelles alertes et possible redémarrage, à examiner.

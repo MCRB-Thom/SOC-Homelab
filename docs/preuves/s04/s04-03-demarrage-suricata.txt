@@ -52,3 +52,9 @@ ActiveEnterTimestamp=Mon 2026-10-19 23:12:03 CEST
 #   "RST injection" du manager Wazuh (1514) vers dc01 au redémarrage (connexions d'agents coupées, ouverture
 #   non vue par Suricata) : faux positif expliqué. Contre ~22 000 alertes STREAM/jour en S2.
 # - Avertissement tpacket-v3 : réglage de performance de la capture AF_PACKET, à activer (af-packet: tpacket-v3: yes).
+
+# (VM) après le redémarrage du 19/10 : ethtool -k enp6s19 | grep -E 'generic-receive|tcp-segmentation:|generic-segmentation'
+        tx-tcp-segmentation: off
+generic-segmentation-offload: off
+generic-receive-offload: off
+# => le drop-in (ExecStartPre) recoupe GRO/GSO/TSO à chaque démarrage de Suricata : réglage persistant.

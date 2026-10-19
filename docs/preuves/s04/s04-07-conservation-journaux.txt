@@ -1,0 +1,56 @@
+# 2026-10-19/20 — VM Wazuh (109) — conservation des journaux : Suricata et indexer Wazuh
+
+# --- 1. Rotation des journaux Suricata ---
+# cat /etc/logrotate.d/suricata; df -h /; du -sh /var/log/suricata /var/ossec/logs/alerts /var/ossec/logs/archives
+# /etc/logrotate.d/suricata (paquet Debian, non modifié) :
+#   rotate 14, compress, copytruncate, postrotate : kill -HUP suricata
+#   aucune fréquence indiquée -> valeur globale de /etc/logrotate.conf : weekly
+/dev/sda1           41G     21G   18G  55% /
+72M     /var/log/suricata
+224M    /var/ossec/logs/alerts
+116K    /var/ossec/logs/archives
+
+# Constats :
+# - Suricata : ~20 Mo/j (eve.json) + ~12 Mo/j (stats.log) ≈ 220 Mo/semaine brut, ~20-30 Mo compressé.
+#   14 rotations hebdomadaires ≈ 14 semaines d'historique pour < 1 Go. Pas d'action nécessaire.
+# - archives Wazuh (logall) désactivées : 116 Ko, rien ne s'y accumule.
+# - stats.log (compteurs toutes les 8 s) pèse plus que les alertes : piste d'allègement, non urgente.
+
+# --- 2. Indexer Wazuh (base du dashboard) : par défaut, aucune suppression automatique ---
+# du -sh /var/lib/wazuh-indexer
+# curl -sk -u admin "https://127.0.0.1:9200/_cat/indices/wazuh-alerts-*?h=index,docs.count,store.size&s=index"
+#   (mot de passe saisi au clavier, non consigné)
+103M    /var/lib/wazuh-indexer
+wazuh-alerts-4.x-2026.01.31   314   211kb
+wazuh-alerts-4.x-2026.02.01   601   2.1mb
+wazuh-alerts-4.x-2026.02.02  1470   1.5mb
+wazuh-alerts-4.x-2026.02.03  4288   3.1mb
+wazuh-alerts-4.x-2026.02.04   267     1mb
+wazuh-alerts-4.x-2026.07.07    80 101.6kb
+wazuh-alerts-4.x-2026.07.08  1011   2.6mb
+wazuh-alerts-4.x-2026.08.20    10  71.2kb
+wazuh-alerts-4.x-2026.08.22   826   1.2mb
+wazuh-alerts-4.x-2026.10.08 67021  14.3mb
+wazuh-alerts-4.x-2026.10.09 22136   4.6mb
+wazuh-alerts-4.x-2026.10.10    35 341.2kb
+wazuh-alerts-4.x-2026.10.11  1014   3.4mb
+wazuh-alerts-4.x-2026.10.13  4136  11.7mb
+wazuh-alerts-4.x-2026.10.16  4871   8.5mb
+wazuh-alerts-4.x-2026.10.17  7532  12.4mb
+wazuh-alerts-4.x-2026.10.18  4852  13.1mb
+wazuh-alerts-4.x-2026.10.19   520   2.6mb
+
+# Constats :
+# - 18 index journaliers, 103 Mo au total, le plus ancien date du 31/01 : rien n'a jamais été supprimé.
+# - Journée de lab active : 8 à 14 Mo. Pire cas mesuré : 14,3 Mo (08/10, 67 021 alertes, avant le
+#   réglage du bruit de la S3). Depuis le réglage : 4 000 à 7 500 alertes/j pour 8 à 13 Mo.
+# - Projection pire cas, lab allumé tous les jours : 15 Mo/j × 365 ≈ 5,5 Go/an, pour 18 Go libres.
+#   -> aucun risque de saturation sur la durée du projet (8 semaines ≈ 1 Go au plus).
+# - Les index comptent des alertes, pas des octets : une campagne bruyante (ex. 67 000 alertes du 08/10)
+#   coûte peu en disque. Le risque réel serait un journal en boucle non réglé, pas l'usage normal.
+
+# Décision :
+# - Pas de politique de suppression (ISM) pour le lab : la capacité le permet et garder tout l'historique
+#   sert les comparaisons avant/après des comptes rendus.
+# - Limite consignée : en production, on fixerait une durée de conservation (ex. 90 jours en ligne,
+#   puis archivage froid) via une politique ISM de l'indexer, alignée sur les exigences légales/internes.
