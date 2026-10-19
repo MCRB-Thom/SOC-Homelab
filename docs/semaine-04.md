@@ -1,6 +1,7 @@
 # Semaine 4 — Suricata sur le lab, conteneur attaquant, gravité des alertes (18 → 20 oct. 2026)
 
-> Statut : **en cours**. Le livrable « activité → détecté par quoi » (section 7) reste à produire.
+> Statut : **en cours**. La matrice de visibilité (section 7) pose le cadre ;
+> ses lignes réseau « à mesurer » se rempliront en S5-S6 avec le conteneur attaquant.
 
 **Objectif** : ajouter la détection réseau (Suricata, règles ET Open) à la chaîne
 Wazuh, sur le trafic du lab, et préparer une machine attaquante pour les tests.
@@ -174,13 +175,49 @@ redémarrage, erreurs masquées par `2>/dev/null`) ; le deuxième a pris une
 vieille alerte de juillet dans les archives. Le ciblage par horodatage a
 réglé le problème : **toujours vérifier que l'on teste bien l'événement visé**.
 
-## 7. Activité → détecté par quoi (à venir)
+## 7. Matrice de visibilité : activité → détecté par quoi
 
-Livrable de la feuille de route pour cette semaine : pour chaque activité
-générée depuis `attacker` ou `ws01`, indiquer quelle source la voit (Suricata,
-Sysmon, journal Windows du contrôleur de domaine) et quelle règle Wazuh
-l'alerte, à quel niveau. Il complète le tableau de la S3 (côté poste) par le
-côté réseau, et prépare la matrice de couverture ATT&CK des semaines 5-6.
+Le lab a maintenant deux points d'observation complémentaires : le **poste**
+(Sysmon, journaux Windows, remontés par l'agent Wazuh) et le **réseau**
+(Suricata sur la VM Wazuh). La question de défense est : pour une activité
+donnée, quelle source la voit, et Wazuh en fait-il une alerte exploitable ?
+
+Le tableau ci-dessous part des activités **déjà exécutées et mesurées** (la
+reconnaissance de la S3 et le test de bout en bout de la S4). Les lignes
+« à mesurer » correspondent aux activités réseau que le conteneur `attacker`
+permettra de générer en S5-S6 : elles sont listées pour cadrer le travail, pas
+affirmées tant qu'une preuve ne les confirme pas.
+
+| Activité | Poste (Sysmon / Windows) | Réseau (Suricata) | Alerte Wazuh | Preuve |
+|---|---|---|---|---|
+| Énumération de comptes / groupes du domaine (`net ...`) | ✅ Sysmon évé. 1 | — (requête locale au DC, peu de signature réseau) | ✅ 92031 / 92039, niveau 3 | [s03-03](preuves/s03/s03-03-chaine-detection.txt) |
+| Énumération des contrôleurs de domaine (`nltest`) | ✅ Sysmon évé. 1 (après correction de la collecte) | — | ✅ 100100, niveau 8 | [s03-03](preuves/s03/s03-03-chaine-detection.txt) |
+| Tâche planifiée créée puis supprimée (`schtasks`) | ✅ Sysmon (chargement de `taskschd.dll`) | — | ⚠️ 92154, niveau 4, sans le nom de la tâche | [s03-03](preuves/s03/s03-03-chaine-detection.txt) |
+| `whoami /all` | ✅ Sysmon évé. 1 | — | ❌ aucune règle | [s03-03](preuves/s03/s03-03-chaine-detection.txt) |
+| Réponse d'un service compromis (`id` → `uid=0(root)`) | — (trafic sortant, pas d'exécution locale) | ✅ 2100498 | ✅ 86601, niveau 3 (Informational) | [s04-04](preuves/s04/s04-04-test-bout-en-bout.txt) |
+| Trafic est-ouest entre deux postes du lab | — | ✅ visible (mode hub vérifié) | selon règle/gravité ET | [s04-01](preuves/s04/s04-01-etat-initial.txt) |
+| Scan de ports vers `dc01` / `ws01` | partiel (journaux Windows) | à mesurer (ET scan) | à mesurer | S5-S6 |
+| Brute force d'authentification | ✅ journaux Windows (échecs d'ouverture de session) | à mesurer | à mesurer | S5-S6 |
+
+**Lecture défensive** :
+
+- **Le poste et le réseau ne se recouvrent pas** : la reconnaissance du domaine
+  se voit côté poste (Sysmon) mais laisse peu de trace réseau exploitable ; une
+  réponse de serveur compromis se voit côté réseau mais n'exécute rien sur le
+  poste. Les deux sources sont nécessaires.
+- **Voir n'est pas alerter** : `whoami` est journalisé mais aucune règle ne le
+  relève ; `schtasks` n'est repéré qu'indirectement. Une activité « vue par
+  Sysmon » n'est pas forcément « remontée à l'analyste ».
+- **Corrélation par IP obligatoire côté réseau** : les alertes Suricata sont
+  rattachées à la sonde (agent `WAZUH`), pas à la machine concernée (section 4).
+  Relier une alerte réseau à un poste passe par l'adresse IP.
+- **Le niveau doit refléter la gravité** : avant la S4, toute alerte réseau
+  sortait au niveau 3 ; les règles 100200-100202 (section 6) alignent le niveau
+  sur l'évaluation Emerging Threats.
+
+Cette matrice se complétera en S5-S6, quand les activités générées depuis
+`attacker` rempliront les lignes « à mesurer » et alimenteront la matrice de
+couverture ATT&CK.
 
 ## 8. Conservation des journaux
 

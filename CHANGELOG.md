@@ -15,6 +15,7 @@ Chaque entrée indique ce qui a changé dans le lab, pourquoi, et la preuve
 - Règles Wazuh locales 100200-100202 : niveau des alertes Suricata selon la gravité Emerging Threats (Critical 12, Major 10, Minor 7, Informational inchangé à 3), vérifiées par `wazuh-logtest` sur l'alerte réelle (`s04-06`).
 - Conservation des journaux vérifiée : Suricata en rotation hebdomadaire × 14 compressées (< 1 Go) ; indexer à 103 Mo, 8 à 14 Mo par jour de lab, jamais purgé (~5,5 Go/an au pire pour 18 Go libres). Pas de politique de suppression dans le lab (`s04-07`).
 - Compte rendu `docs/semaine-04.md` ; `docs/architecture.md` mis à jour (Suricata sur la VM Wazuh, conteneur `attacker`, mode hub présenté comme raccourci de lab face au port mirroring / TAP).
+- Matrice de visibilité « activité → détecté par quoi » (poste Sysmon + réseau Suricata) : lignes mesurées (reconnaissance S3, test de bout en bout S4) remplies, lignes réseau scan/brute force cadrées pour S5-S6 (`docs/semaine-04.md` §7).
 
 ### Constat
 - Bruit `SURICATA STREAM` disparu : 1 alerte en 2 jours (coupure des connexions d'agents au redémarrage du manager), contre ~22 000/jour en S2.
@@ -23,7 +24,7 @@ Chaque entrée indique ce qui a changé dans le lab, pourquoi, et la preuve
 - `eve.json` : ~20 Mo/jour (tous les flux et le DNS, pas seulement les alertes) ; `stats.log` (~12 Mo/jour) pèse plus que les alertes.
 
 ### Reste à faire
-- Tableau « activité → détecté par quoi » (livrable S4).
+- Lignes réseau « à mesurer » de la matrice de visibilité (scan, brute force) : S5-S6 avec le conteneur attaquant.
 - Option : `tpacket-v3` pour la capture AF_PACKET (avertissement au démarrage).
 
 ## 2026-10-16 → 18 — Semaine 3 : reprise, SSD, test de détection, angle mort nltest, réglage du bruit
