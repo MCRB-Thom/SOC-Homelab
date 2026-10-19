@@ -1,0 +1,60 @@
+# 2026-10-18 — VM Wazuh (109) — reconfiguration de Suricata sur le réseau du lab
+# Points de retour : /root/suricata.yaml.s04-avant (config d'origine), sauvegarde des règles par suricata-update,
+# snapshot Proxmox s04-avant (VM 109, pris avant les étapes A-C : état d'origine).
+
+# (VM) Comment le service démarre-t-il ?
+# systemctl cat suricata | grep -E 'ExecStart|EnvironmentFile'; grep -v '^#' /etc/default/suricata | grep -v '^$';
+# ethtool -k enp6s19 | grep -E 'generic-receive|large-receive|tcp-segmentation|generic-segmentation'
+ExecStart=/usr/bin/suricata -D --af-packet -c /etc/suricata/suricata.yaml --pidfile /run/suricata.pid
+RUN=no
+SURCONF=/etc/suricata/suricata.yaml
+LISTENMODE=nfqueue
+IFACE=eth0
+NFQUEUE=0
+TCMALLOC="YES"
+PIDFILE=/var/run/suricata.pid
+tcp-segmentation-offload: on
+        tx-tcp-segmentation: on
+generic-segmentation-offload: on
+generic-receive-offload: on
+large-receive-offload: off [fixed]
+# => pas d'EnvironmentFile : /etc/default/suricata (nfqueue, eth0) est ignoré ; l'interface vient de la
+#    section af-packet de suricata.yaml.
+# => GRO/GSO/TSO actifs sur l'interface de capture : paquets fusionnés avant Suricata, cause probable
+#    des ~22 000 alertes "SURICATA STREAM" par jour observées en S2.
+
+# --- A. suricata.yaml : HOME_NET et interface de capture ---
+# cp -p /etc/suricata/suricata.yaml /root/suricata.yaml.s04-avant && sed -i -e '<HOME_NET>' -e '<interface>' ... && diff ...
+18c18
+<     HOME_NET: "[192.168.1.0/24]"
+---
+>     HOME_NET: "[10.10.10.0/24]"
+622c622
+<   - interface: enp6s18
+---
+>   - interface: enp6s19
+
+# --- B. Drop-in systemd : configs/suricata/suricata.service.d/override.conf ---
+# F=/home/user/override.conf; echo "b1f1d29a...7eb418  $F" | sha256sum -c && mkdir -p ... && mv ... && chown/chmod ...
+#   && systemctl daemon-reload && systemctl cat suricata | grep ExecStartPre
+/home/user/override.conf: Réussi
+ExecStartPre=/usr/sbin/ethtool -K enp6s19 gro off gso off tso off
+
+# --- C. Règles ET Open ---
+# suricata-update 2>&1 | tail -6; ls -la /var/lib/suricata/rules/
+18/10/2026 -- 15:02:41 - <Info> -- Enabled 136 rules for flowbit dependencies.
+18/10/2026 -- 15:02:41 - <Info> -- Backing up current rules.
+18/10/2026 -- 15:02:44 - <Info> -- Writing rules to /var/lib/suricata/rules/suricata.rules: total: 69151; enabled: 53195; added: 1386; removed 106; modified: 7851
+18/10/2026 -- 15:02:44 - <Info> -- Writing /var/lib/suricata/rules/classification.config
+18/10/2026 -- 15:02:44 - <Info> -- Testing with suricata -T.
+18/10/2026 -- 15:03:09 - <Info> -- Done.
+-rw-r--r-- 1 root root     3228 18 oct.  15:02 classification.config
+-rw-r--r-- 1 root root 45938418 18 oct.  15:02 suricata.rules
+# => 69 151 règles (53 195 actives), mises à jour depuis le 8 juillet ; config testée par suricata-update (suricata -T).
+
+# --- Snapshot (hôte), avant les étapes A-C ---
+# qm snapshot 109 s04-avant --description "Avant reconfiguration Suricata (S4)"
+skipping guest filesystem freeze - disabled in VM options
+snapshotting 'drive-scsi0' (ssd:vm-109-disk-0)
+  Logical volume "snap_vm-109-disk-0_s04-avant" created.
+# => pris avant les modifications A-C (sortie transmise après coup) : point de retour à l'état d'origine.

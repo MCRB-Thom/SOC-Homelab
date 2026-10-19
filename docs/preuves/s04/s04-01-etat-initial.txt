@@ -1,0 +1,61 @@
+# 2026-10-18 — Hôte Proxmox + VM Wazuh (109) — état initial avant la semaine 4 (Suricata)
+
+# (hôte) cat /sys/class/net/vmbr1/bridge/ageing_time; grep -A6 'iface vmbr1' /etc/network/interfaces; pct list
+0
+iface vmbr1 inet static
+        address 10.10.10.1/24
+        bridge-ports none
+        bridge-stp off
+        bridge-fd 0
+        bridge-ageing 0
+        post-up   echo 1 > /proc/sys/net/ipv4/ip_forward
+# (pct list : aucune sortie, aucun conteneur LXC)
+
+# (VM) suricata -V; systemctl is-enabled suricata; systemctl is-active suricata; ip -br addr; free -h; df -h /;
+#      ls -la /var/lib/suricata/rules/; grep -nE '^\s+- interface:|HOME_NET:' /etc/suricata/suricata.yaml | head
+This is Suricata version 7.0.10 RELEASE
+disabled
+inactive
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+enp6s18          UP             192.168.1.40/24 [IPv6 publique masquée] fe80::be24:11ff:fe69:d2a0/64
+enp6s19          UP             10.10.10.10/24 fe80::be24:11ff:fe18:5e00/64
+               total       utilisé      libre     partagé tamp/cache   disponible
+Mem:           5,8Gi       3,5Gi       1,4Gi       752Ki       1,1Gi       2,3Gi
+Échange:       974Mi          0B       974Mi
+Sys. de fichiers Taille Utilisé Dispo Uti% Monté sur
+/dev/sda1           41G     21G   18G  54% /
+total 43812
+-rw-r--r-- 1 root root     3228  8 juil. 14:16 classification.config
+-rw-r--r-- 1 root root 44850923  8 juil. 14:16 suricata.rules
+18:    HOME_NET: "[192.168.1.0/24]"
+622:  - interface: enp6s18
+[... lignes 700-801 : exemples commentés / sections "default" ...]
+
+# Constats :
+# - vmbr1 en mode hub (ageing_time 0, réglage persistant dans /etc/network/interfaces).
+# - Suricata 7.0.10 toujours arrêté et désactivé depuis la S2 ; règles du 8 juillet (3 mois).
+# - Config héritée à corriger : capture sur enp6s18 (LAN) et HOME_NET = 192.168.1.0/24 (LAN domestique).
+#   Cible : capture sur enp6s19 (lab), HOME_NET = 10.10.10.0/24.
+# - Marge RAM : 2,3 Gio disponibles, pas de swap ; disque à 54 %.
+# - Pas encore de conteneur attaquant.
+
+# --- Test du mode hub : la VM Wazuh voit-elle le trafic ws01 <-> dc01 (qui ne la concerne pas) ? ---
+# (VM)   timeout 30 tcpdump -ni enp6s19 -c 10 'host 10.10.10.20 and host 10.10.10.30'
+# (ws01) ping -n 10 10.10.10.20   (pendant la capture)
+listening on enp6s19, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+13:02:19.470437 IP 10.10.10.30 > 10.10.10.20: ICMP echo request, id 1, seq 5, length 40
+13:02:19.470647 IP 10.10.10.20 > 10.10.10.30: ICMP echo reply, id 1, seq 5, length 40
+13:02:20.020378 ARP, Request who-has 10.10.10.30 (bc:24:11:2a:e9:b2) tell 10.10.10.20, length 28
+13:02:20.020538 ARP, Reply 10.10.10.30 is-at bc:24:11:2a:e9:b2, length 28
+13:02:20.231410 ARP, Request who-has 10.10.10.20 (bc:24:11:b9:b8:ed) tell 10.10.10.30, length 28
+13:02:20.231425 ARP, Reply 10.10.10.20 is-at bc:24:11:b9:b8:ed, length 28
+13:02:20.485375 IP 10.10.10.30 > 10.10.10.20: ICMP echo request, id 1, seq 6, length 40
+13:02:20.485585 IP 10.10.10.20 > 10.10.10.30: ICMP echo reply, id 1, seq 6, length 40
+13:02:21.501479 IP 10.10.10.30 > 10.10.10.20: ICMP echo request, id 1, seq 7, length 40
+13:02:21.501747 IP 10.10.10.20 > 10.10.10.30: ICMP echo reply, id 1, seq 7, length 40
+10 packets captured
+10 packets received by filter
+0 packets dropped by kernel
+
+# => mode hub confirmé : trafic unicast entre deux autres machines visible, y compris les réponses ARP
+#    unicast. 0 paquet perdu. Suricata sur enp6s19 verra le trafic est-ouest du lab.

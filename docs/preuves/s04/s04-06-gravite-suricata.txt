@@ -1,0 +1,64 @@
+# 2026-10-19 — VM Wazuh (109) — règles locales de gravité Suricata (100200-100202)
+# Fichier : configs/wazuh/rules/soclab_rules.xml (groupe soclab,ids,suricata)
+
+# Problème (s04-04) : toute alerte Suricata devient 86601 niveau 3 dans Wazuh. alert.severity ne suffit pas :
+# le test "uid=0(root)" (2100498) a alert.severity 2 mais signature_severity ET "Informational".
+# Choix : niveau Wazuh selon l'évaluation ET (metadata.signature_severity), règles enfants de 86601.
+#   Critical -> 100200 niveau 12 | Major -> 100201 niveau 10 | Minor -> 100202 niveau 7
+#   Informational / sans métadonnée -> 86601 niveau 3 (inchangé)
+
+# --- Tests hors ligne (configs/wazuh/rules/test_soclab_rules.py), partie gravité ---
+OK gravité 'Informational' -> 86601 (niveau 3)
+OK gravité '["Informational"]' -> 86601 (niveau 3)
+OK gravité 'Major' -> 100201
+OK gravité '["Major"]' -> 100201
+OK gravité 'Critical' -> 100200
+OK gravité '["Critical"]' -> 100200
+OK gravité 'Minor' -> 100202
+OK gravité '' -> 86601 (niveau 3)
+OK gravité 'Majority' -> 86601 (niveau 3)
+TOUS LES TESTS PASSENT   (les 13 tests de la S3 passent toujours)
+# SHA-256 de soclab_rules.xml déployé : b706d2d55e801e1fabd0394dd8c85123926ca4f35a889d9e1e77fb148c0d4222
+
+# --- Déploiement (VM) : sha256sum -c, sauvegarde, installation, wazuh-analysisd -t, redémarrage du manager ---
+
+# --- Vérification avec wazuh-logtest sur l'alerte réelle du 18/10 23:35 et trois variantes ---
+# 1er essai (lancé juste après le redémarrage, erreurs masquées par 2>/dev/null) : aucune sortie.
+# 2e essai : zgrep sur eve.json* a pris la dernière ligne de la plus vieille archive (alerte du 8 juillet,
+#   époque de la capture sur le LAN) -> 86601 niveau 3. Ciblage corrigé par l'horodatage.
+# (VM) sha256sum /var/ossec/etc/rules/soclab_rules.xml;
+#      L=$(grep '"signature_id":2100498' /var/log/suricata/eve.json | grep '"timestamp":"2026-10-18T23:35' | tail -1);
+#      for s in Informational Minor Major Critical; do echo "${L//Informational/$s}" | wazuh-logtest | grep -E 'id|level|description'; done
+b706d2d55e801e1fabd0394dd8c85123926ca4f35a889d9e1e77fb148c0d4222  /var/ossec/etc/rules/soclab_rules.xml
+longueur de L : 769
+== Informational
+        id: '86601'
+        level: '3'
+        description: 'Suricata: Alert - GPL ATTACK_RESPONSE id check returned root'
+== Minor
+        id: '100202'
+        level: '7'
+        description: 'Suricata (ET Minor) : GPL ATTACK_RESPONSE id check returned root - 44.210.74.85 -> 10.10.10.30'
+== Major
+        id: '100201'
+        level: '10'
+        description: 'Suricata (ET Major) : GPL ATTACK_RESPONSE id check returned root - 44.210.74.85 -> 10.10.10.30'
+== Critical
+        id: '100200'
+        level: '12'
+        description: 'Suricata (ET Critical) : GPL ATTACK_RESPONSE id check returned root - 44.210.74.85 -> 10.10.10.30'
+
+# Constats :
+# - Les 4 cas donnent la règle et le niveau prévus ; l'alerte réelle (Informational) reste au niveau 3.
+# - La description porte désormais source et destination : la machine concernée est lisible malgré le
+#   rattachement de l'alerte à l'agent WAZUH (sonde).
+# - Limite : alerte avec alert.severity 1 sans métadonnée ET (règles Suricata internes) non relevée.
+
+# --- Observations annexes (ls -la /var/log/suricata/, 19/10 23:47) ---
+-rw-r--r--  1 root root 39276533 19 oct.  23:47 eve.json
+-rw-r--r--  1 root root      394 19 oct.  23:12 fast.log
+-rw-r--r--  1 root root 25252382 19 oct.  23:47 stats.log
+-rw-r--r--  1 root root     3631 19 oct.  23:12 suricata.log
+# - eve.json : 39 Mo en ~2 jours (tous les flux, DNS, HTTP... pas seulement les alertes) ; stats.log : 25 Mo.
+#   Rotation quotidienne observée (eve.json.1 le 18/10 00:00), conservation à vérifier.
+# - fast.log et suricata.log modifiés le 19/10 à 23:12 : nouvelles alertes et possible redémarrage, à examiner.

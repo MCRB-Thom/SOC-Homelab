@@ -1,9 +1,9 @@
-# Semaine 3 — Reprise, passage sur SSD et chaîne de détection (16 oct. 2026 → …)
+# Semaine 3 — Reprise, passage sur SSD et chaîne de détection (16 → 18 oct. 2026)
 
 **Objectif** : valider la chaîne complète Sysmon → agent → règle Wazuh → alerte
 sur une activité de test, après avoir levé le goulot disque du lab.
 
-**Résultat (en cours)** : lab repris après un changement de PC d'administration,
+**Résultat** : lab repris après un changement de PC d'administration,
 VM du projet déplacées sur SSD (démarrage de l'indexer 274 s → 19 s). Premier
 test de la chaîne de détection : Sysmon voit 5 commandes de reconnaissance sur
 6, Wazuh n'en alerte explicitement que 2, en niveau 3, pendant qu'un faux

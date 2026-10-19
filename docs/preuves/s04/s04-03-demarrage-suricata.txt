@@ -1,0 +1,54 @@
+# 2026-10-18 — VM Wazuh (109) — démarrage de Suricata et mesure de l'impact
+
+# (VM) avant : free -m | sed -n 2p; uptime
+Mem:            5925        3716        1101           0        1392        2208
+ 15:19:41 up  3:01,  1 user,  load average: 0,00, 0,00, 0,01
+
+# (VM) systemctl enable --now suricata && sleep 60 && systemctl is-active suricata && ethtool -k enp6s19 | grep ...
+Created symlink /etc/systemd/system/multi-user.target.wants/suricata.service → /lib/systemd/system/suricata.service.
+active
+        tx-tcp-segmentation: off
+generic-segmentation-offload: off
+generic-receive-offload: off
+# => drop-in appliqué : GRO/GSO/TSO coupés sur l'interface de capture.
+
+# (VM) après (~6 min) : free -m | sed -n 2p; uptime; ps -C Suricata-Main,suricata -o rss=,pcpu=,comm=;
+#      grep -E 'interface|Engine started|threads' /var/log/suricata/suricata.log | tail -4;
+#      grep -E 'capture.kernel_(packets|drops)' /var/log/suricata/stats.log | tail -2
+Mem:            5925        4288         526           0        1397        1636
+ 15:26:15 up  3:08,  1 user,  load average: 0,07, 0,04, 0,01
+550084 6.6 Suricata-Main
+[4420 - Suricata-Main] 2026-10-18 15:20:28 Info: runmodes: enp6s19: creating 2 threads
+[4420 - Suricata-Main] 2026-10-18 15:20:28 Notice: threads: Threads created -> W: 2 FM: 1 FR: 1   Engine started.
+capture.kernel_packets                        | Total                     | 1235
+capture.kernel_packets                        | Total                     | 1248
+
+# Bilan :
+#                       avant      après      écart
+#   RAM utilisée        3 716 Mo   4 288 Mo   +572 Mo
+#   RAM disponible      2 208 Mo   1 636 Mo
+#   RSS Suricata                   550 Mo
+#   CPU Suricata                   6,6 % (moyenne depuis le démarrage, chargement de 53 195 règles inclus)
+#   load average        0,00       0,07
+# - Capture sur enp6s19, 2 threads de travail ; 1 248 paquets, aucune perte (compteur kernel_drops absent :
+#   stats.log n'écrit pas les compteurs nuls).
+# - Marge RAM réduite à 1,6 Gio : à surveiller (la VM à 6 Go reste suffisante pour l'instant).
+
+# --- Redémarrage de la VM Wazuh le 19/10 à 23:11:59 : Suricata repart-il seul ? ---
+# (VM) cat /var/log/suricata/fast.log; tail -8 /var/log/suricata/suricata.log;
+#      systemctl show suricata -p ActiveEnterTimestamp; uptime -s
+10/18/2026-23:35:04.983706  [**] [1:2100498:7] GPL ATTACK_RESPONSE id check returned root [**] [Classification: Potentially Bad Traffic] [Priority: 2] {TCP} 44.210.74.85:80 -> 10.10.10.30:51626
+10/19/2026-23:12:44.988609  [**] [1:2210058:1] SURICATA STREAM suspected RST injection [**] [Classification: Generic Protocol Command Decode] [Priority: 3] {TCP} 10.10.10.10:1514 -> 10.10.10.20:57917
+[638 - Suricata-Main] 2026-10-19 23:12:19 Info: detect: 1 rule files processed. 53195 rules successfully loaded, 0 rules failed, 0
+[638 - Suricata-Main] 2026-10-19 23:12:42 Warning: af-packet: enp6s19: AF_PACKET tpacket-v3 is recommended for non-inline operation
+[638 - Suricata-Main] 2026-10-19 23:12:42 Info: runmodes: enp6s19: creating 2 threads
+[638 - Suricata-Main] 2026-10-19 23:12:42 Notice: threads: Threads created -> W: 2 FM: 1 FR: 1   Engine started.
+ActiveEnterTimestamp=Mon 2026-10-19 23:12:03 CEST
+2026-10-19 23:11:59
+
+# Constats :
+# - Démarrage automatique validé : VM à 23:11:59, Suricata 4 s plus tard, 53 195 règles, 0 échec.
+# - En 2 jours (18/10 15:20 -> 19/10 23:47) : 2 alertes Suricata au total. La seule alerte STREAM est un
+#   "RST injection" du manager Wazuh (1514) vers dc01 au redémarrage (connexions d'agents coupées, ouverture
+#   non vue par Suricata) : faux positif expliqué. Contre ~22 000 alertes STREAM/jour en S2.
+# - Avertissement tpacket-v3 : réglage de performance de la capture AF_PACKET, à activer (af-packet: tpacket-v3: yes).

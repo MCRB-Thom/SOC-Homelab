@@ -4,6 +4,22 @@ Format : une entrée par session de travail, la plus récente en haut.
 Chaque entrée indique ce qui a changé dans le lab, pourquoi, et la preuve
 (`docs/preuves/`, `docs/screenshots/`).
 
+## 2026-10-18 → 20 — Semaine 4 (en cours) : Suricata sur le lab, conteneur attaquant, gravité des alertes
+
+### Fait
+- Mode hub de `vmbr1` vérifié : la VM Wazuh voit le trafic `ws01` ↔ `dc01`, réponses ARP unicast comprises, 0 paquet perdu (`docs/preuves/s04/s04-01-etat-initial.txt`).
+- Suricata reconfiguré sur le lab : `HOME_NET` 10.10.10.0/24, capture sur `enp6s19` au lieu du LAN, règles ET Open mises à jour (53 195 actives), drop-in systemd qui coupe GRO/GSO/TSO avant chaque démarrage (`configs/suricata/suricata.service.d/override.conf`, `s04-02`).
+- Suricata démarré et activé au boot : +572 Mo de RAM sur la VM Wazuh (1,6 Gio restants), aucune perte de paquets ; redémarrage automatique vérifié (`s04-03`).
+- Chaîne trafic → Suricata → Wazuh validée en ~5 s (règle 2100498 via httpbin.org, `testmynids.org` n'existant plus) (`s04-04`).
+- Conteneur LXC `attacker` (130) : Debian 12, non privilégié, 10.10.10.66 sur `vmbr1`, disque sur le SSD, Nmap 7.93 et Hydra 9.4, snapshot `s04-base` (`s04-05`).
+- Règles Wazuh locales 100200-100202 : niveau des alertes Suricata selon la gravité Emerging Threats (Critical 12, Major 10, Minor 7, Informational inchangé à 3), vérifiées par `wazuh-logtest` sur l'alerte réelle (`s04-06`).
+
+### Constat
+- Bruit `SURICATA STREAM` disparu : 1 alerte en 2 jours (coupure des connexions d'agents au redémarrage du manager), contre ~22 000/jour en S2.
+- Wazuh ramenait toute alerte Suricata au niveau 3 (règle 86601), et `alert.severity` seule est trop grossière : le test `uid=0(root)` vaut 2 mais ET le classe « Informational ».
+- Les alertes Suricata sont rattachées à la sonde (agent `WAZUH`), pas à la machine visée : corrélation par IP nécessaire avec Sysmon.
+- `eve.json` : ~20 Mo/jour (tous les flux et le DNS, pas seulement les alertes) ; conservation à vérifier.
+
 ## 2026-10-16 → 18 — Semaine 3 : reprise, SSD, test de détection, angle mort nltest, réglage du bruit
 
 ### Fait

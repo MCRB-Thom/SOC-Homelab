@@ -35,4 +35,21 @@ for rid, expect, img, tgt in tests:
     ok &= got == expect
     print(("OK " if got == expect else "KO ") + rid, "attendu", "ignoré" if expect else "alerte", "|",
           B.join(img.split(B)[-2:]), "->", B.join(tgt.split(B)[-3:]))
+# Règles de gravité Suricata : valeur de alert.metadata.signature_severity -> règle attendue (None = 86601, niveau 3)
+SEV = [
+ ("Informational", None),                # cas réel : alerte 2100498 du 18/10 (capture s04-wazuh-suricata-detail-1.png)
+ ('["Informational"]', None),
+ ("Major", "100201"),
+ ('["Major"]', "100201"),
+ ("Critical", "100200"),
+ ('["Critical"]', "100200"),
+ ("Minor", "100202"),
+ ("", None),                             # règle sans métadonnée ET
+ ("Majority", None),                     # piège : mot qui contient "Major"
+]
+order = ["100200", "100201", "100202"]   # ordre de déclaration dans soclab_rules.xml
+for val, expect in SEV:
+    got = next((rid for rid in order if re.search(rules[rid]["alert.metadata.signature_severity"], val)), None)
+    ok &= got == expect
+    print(("OK " if got == expect else "KO ") + "gravité", repr(val), "->", got or "86601 (niveau 3)")
 print("TOUS LES TESTS PASSENT" if ok else "ECHEC")

@@ -1,0 +1,38 @@
+# 2026-10-18 — Hôte Proxmox — conteneur LXC "attacker" (130)
+
+# (hôte) pveam update && pveam available --section system | grep -E 'debian-12|debian-13'; pveam list local
+update successful
+system          debian-12-standard_12.12-1_amd64.tar.zst                     amd64
+system          debian-13-standard_13.6-1_amd64.tar.zst                      amd64
+system          debian-13-standard_13.6-1_arm64.tar.zst                      arm64
+# (aucun modèle local) -> pveam download local debian-12-standard_12.12-1_amd64.tar.zst
+
+# (hôte) pct create 130 local:vztmpl/debian-12-standard_12.12-1_amd64.tar.zst --hostname attacker --cores 1
+#        --memory 512 --swap 512 --rootfs ssd:8 --net0 name=eth0,bridge=vmbr1,ip=10.10.10.66/24,gw=10.10.10.1
+#        --nameserver 10.10.10.20 --searchdomain soclab.internal --unprivileged 1 --onboot 0 && pct start 130
+
+# (hôte) pct exec 130 -- bash -c "apt-get update -qq && apt-get install -y -qq nmap hydra curl dnsutils smbclient
+#        && nmap --version | head -1 && hydra -h | head -1"; free -h | sed -n 2p
+[avertissements "locale" sans conséquence : modèle Debian sans locale générée]
+Nmap version 7.93 ( https://nmap.org )
+Hydra v9.4 (c) 2022 by van Hauser/THC & David Maciejak [...]
+Mem:            15Gi        12Gi       562Mi        50Mi       3.0Gi       3.1Gi
+
+# Constats :
+# - Conteneur non privilégié, sur vmbr1 (10.10.10.66), disque sur le SSD, non démarré avec l'hôte.
+# - Outils : Nmap 7.93, Hydra 9.4, curl, dig, smbclient. Impacket reporté aux semaines 5-6.
+# - Hôte avec 4 machines allumées : 3,1 Gio de RAM disponibles, budget tenu.
+
+# (hôte) pct exec 130 -- ip -br addr show eth0; pct config 130 | grep -E 'hostname|memory|net0|rootfs|unprivileged'
+eth0@if12        UP             10.10.10.66/24 fe80::be24:11ff:feea:885/64
+hostname: attacker
+memory: 512
+net0: name=eth0,bridge=vmbr1,gw=10.10.10.1,hwaddr=BC:24:11:EA:08:85,ip=10.10.10.66/24,type=veth
+rootfs: ssd:vm-130-disk-0,size=8G
+unprivileged: 1
+
+# (hôte) pct snapshot 130 s04-base --description "Attaquant installé (nmap, hydra)"
+freeze guest filesystem
+  Logical volume "snap_vm-130-disk-0_s04-base" created.
+thaw guest filesystem
+# => conteneur conforme au plan d'adressage ; point de retour s04-base avant les tests.

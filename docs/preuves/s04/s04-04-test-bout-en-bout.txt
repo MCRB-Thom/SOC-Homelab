@@ -1,0 +1,40 @@
+# 2026-10-18 — ws01 + VM Wazuh (109) — test de bout en bout : trafic -> Suricata -> Wazuh
+
+# 1er essai : site de test classique des IDS (testmynids.org)
+# (ws01) curl.exe -s http://testmynids.org/uid/index.html  -> aucune sortie
+# (ws01) Resolve-DnsName testmynids.org ; curl.exe -sS ...
+Resolve-DnsName : testmynids.org : Le nom DNS n'existe pas
+curl: (6) Could not resolve host: testmynids.org
+# (ws01) Resolve-DnsName google.com ; Resolve-DnsName testmynids.org -Server 1.1.1.1
+google.com 142.251.39.206
+Resolve-DnsName : testmynids.org : Le nom DNS n'existe pas
+# => DNS du lab fonctionnel ; le domaine testmynids.org n'existe plus (NXDOMAIN aussi chez Cloudflare).
+
+# 2e essai : même réponse reproduite avec httpbin.org (décodage base64 de "uid=0(root) gid=0(root) groups=0(root)")
+# (ws01) curl.exe -sS -m 10 -w "`nHTTP %{http_code} - IP %{remote_ip}`n" http://httpbin.org/base64/dWlkPTAocm9vdCkgZ2lkPTAocm9vdCkgZ3JvdXBzPTAocm9vdCkK; Get-Date
+uid=0(root) gid=0(root) groups=0(root)
+HTTP 200 - IP 44.210.74.85
+dimanche 18 octobre 2026 23:35:01
+
+# (VM) dernières alertes de eve.json ; alertes Wazuh du groupe suricata depuis 15:20 ; date
+23:35:04 2100498 GPL ATTACK_RESPONSE id check returned root 44.210.74.85 -> 10.10.10.30
+23:35:06 86601 3 Suricata: Alert - GPL ATTACK_RESPONSE id check returned root
+dim. 18 oct. 2026 23:36:04 CEST
+
+# Constats :
+# - Chaîne complète validée : requête (23:35:01) -> alerte Suricata (23:35:04) -> alerte Wazuh (23:35:06), ~5 s.
+# - Horloges ws01 / VM Wazuh cohérentes.
+# - Une seule alerte Suricata entre 15:20 (démarrage) et 23:36 : plus aucun bruit "SURICATA STREAM"
+#   (~22 000/jour en S2, capture sur le LAN avec GRO/GSO/TSO actifs).
+# - Wazuh ramène toute alerte Suricata à la règle 86601 niveau 3, quelle que soit sa gravité Suricata
+#   (alert.severity) : une attaque réseau sortirait au niveau du bruit. Réglage à prévoir (règle locale).
+
+# --- Détail de l'alerte dans Wazuh (captures s04-wazuh-suricata-detail-1/2.png) ---
+# agent.name WAZUH (000) | data.alert.signature_id 2100498 | data.alert.category Potentially Bad Traffic
+# data.alert.severity 2 | data.alert.metadata.signature_severity Informational | data.alert.metadata.confidence Medium
+# data.in_iface enp6s19 | data.src_ip 44.210.74.85:80 -> data.dest_ip 10.10.10.30:51626 | rule.id 86601 | rule.level 3
+# Constats :
+# - L'alerte est rattachée à la sonde (agent WAZUH), pas à ws01 : corrélation par IP nécessaire avec Sysmon.
+# - Deux notions de gravité coexistent : alert.severity (priorité de la classe de règle, 1 = élevée à 3 = faible)
+#   et signature_severity (évaluation propre à ET : Informational / Minor / Major / Critical). Ici 2 et
+#   "Informational" : un réglage fondé sur alert.severity seule remonterait ce test au rang d'incident.
