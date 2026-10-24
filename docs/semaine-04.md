@@ -25,6 +25,7 @@ journaux vérifiée : aucun risque de saturation sur la durée du projet.
 | 5 | Conteneur attaquant `attacker` (130) | [s04-05](preuves/s04/s04-05-conteneur-attaquant.txt) |
 | 6 | Gravité des alertes Suricata : règles 100200-100202 | [s04-06](preuves/s04/s04-06-gravite-suricata.txt) |
 | 7 | Conservation des journaux (Suricata, indexer) | [s04-07](preuves/s04/s04-07-conservation-journaux.txt) |
+| 8 | Activation de `tpacket-v3` (capture AF_PACKET) | [s04-08](preuves/s04/s04-08-tpacket-v3.txt) |
 
 ---
 
@@ -238,14 +239,36 @@ Observation : la journée la plus lourde (08/10, 67 021 alertes, avant le régla
 du bruit) ne pèse que 14 Mo. Le coût disque suit le contenu des alertes plus
 que leur nombre.
 
+## 9. Activation de tpacket-v3
+
+Depuis son premier démarrage, Suricata émettait au lancement
+`AF_PACKET tpacket-v3 is recommended for non-inline operation`. AF_PACKET est
+le mécanisme par lequel le noyau livre une copie des paquets à Suricata ; son
+tampon en anneau existe en deux versions. **tpacket-v2** (défaut) alloue un
+emplacement par paquet ; **tpacket-v3** les regroupe par blocs en mémoire
+partagée, ce qui réduit les réveils du CPU et convient à la capture passive.
+
+Les deux clés nécessaires étaient commentées dans `suricata.yaml` (section
+`af-packet`, interface `enp6s19`) : `use-mmap: yes` (le tampon en anneau) et
+`tpacket-v3: yes`, ce dernier n'étant actif que si le premier l'est. Les deux
+ont été décommentées, la config validée par `suricata -T`, puis le service
+redémarré.
+
+**Résultat** : l'avertissement a disparu (0 occurrence dans le journal).
+Suricata n'écrit pas de ligne confirmant l'usage de v3 : son absence, config
+valide à l'appui, fait foi. Le bénéfice est en CPU et **ne se mesure pas** au
+débit du lab, où le run précédent (encore en v2) affichait déjà 236 469 paquets
+pour **0 perte**. C'est donc un réglage de propreté (avertissement levé, bonne
+pratique de capture passive) plus qu'un gain de performance visible ici.
+
 ## Limites connues
 
 - **Mode hub** : propre au lab (voir section 1). En production : port mirroring
   ou TAP.
 - **Sonde sur la VM Wazuh** : la détection réseau partage la RAM du SIEM
   (marge ramenée à 1,6 Gio) ; une panne de la VM coupe les deux.
-- **Avertissement AF_PACKET** : `tpacket-v3` recommandé pour la capture passive,
-  non encore activé (performance, sans effet visible au débit du lab).
+- **`tpacket-v3`** activé (section 9) : avertissement AF_PACKET levé, gain CPU
+  non mesurable au débit du lab (aucune perte de paquet déjà en v2).
 - **Alertes rattachées à la sonde** : corrélation poste ↔ réseau par IP
   uniquement.
 - Règles 100200-100202 : une alerte Suricata de priorité 1 **sans**

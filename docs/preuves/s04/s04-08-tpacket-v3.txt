@@ -1,0 +1,42 @@
+# 2026-10-25 — VM Wazuh (109) — activation de tpacket-v3 pour la capture AF_PACKET
+# Point de retour : /root/suricata.yaml.s04-tpacket (config avant modification)
+
+# Contexte : au démarrage, Suricata émettait
+#   Warning: af-packet: enp6s19: AF_PACKET tpacket-v3 is recommended for non-inline operation
+# tpacket-v3 est le mode de tampon en anneau d'AF_PACKET recommandé pour la capture passive (IDS) :
+# les paquets sont regroupés par blocs en mémoire partagée, ce qui réduit les réveils du CPU.
+# Il n'est actif que si use-mmap est vrai : les deux étaient commentés dans suricata.yaml.
+
+# --- Modification (section af-packet, interface enp6s19) ---
+# sed : décommenter use-mmap: yes et tpacket-v3: yes. Un second passage a été nécessaire car le
+# motif a aussi décommenté tpacket-v3 dans le bloc modèle "- interface: default" (inutilisé, enp6s19
+# étant listé explicitement) : ligne re-commentée pour que le diff ne touche que l'interface réelle.
+# État final (grep sur la section af-packet) :
+24:    use-mmap: yes          # interface enp6s19
+30:    tpacket-v3: yes        # interface enp6s19
+82:    #use-mmap: no          # bloc "default" : inchangé
+83:    #tpacket-v3: yes       # bloc "default" : inchangé
+
+# --- Validation avant redémarrage ---
+# suricata -T -c /etc/suricata/suricata.yaml -v 2>&1 | tail -2
+Info: detect: 53200 signatures processed. 1210 are IP-only rules, 4548 are inspecting packet payload, 47207 inspect application layer, 109 are decoder event only
+Notice: suricata: Configuration provided was successfully loaded. Exiting.
+
+# --- Redémarrage et vérification ---
+# systemctl restart suricata && sleep 8 && systemctl is-active suricata && tail -15 suricata.log
+#   && grep -c 'tpacket-v3 is recommended' suricata.log
+active
+# Arrêt propre de l'ancien processus (run encore en tpacket-v2, 41 min de fonctionnement) :
+[641] 2026-10-25 00:23:54 Info: suricata: time elapsed 2475.449s
+[641] 2026-10-25 00:23:54 Info: counters: Alerts: 0
+[641] 2026-10-25 00:23:55 Notice: device: enp6s19: packets: 236469, drops: 0 (0.00%), invalid chksum: 0
+# Nouveau processus (tpacket-v3) : démarrage normal, fast/eve/stats réinitialisés.
+[3690] 2026-10-25 00:23:55 Notice: suricata: This is Suricata version 7.0.10 RELEASE running in SYSTEM mode
+grep -c 'tpacket-v3 is recommended' : 0
+
+# Constats :
+# - Avertissement tpacket-v3 disparu (0 occurrence). Suricata n'émet pas de ligne affirmant l'usage de
+#   v3 : l'absence de la recommandation, config validée à l'appui, est la confirmation.
+# - Le run précédent (tpacket-v2) affichait déjà 236 469 paquets pour 0 perte (0,00 %) : au débit du lab
+#   il n'y avait aucune perte à corriger. Le bénéfice de v3 est en CPU (moins de réveils), non mesurable ici.
+# - Réglage persistant : écrit dans suricata.yaml, rechargé à chaque démarrage comme le reste de la config.
