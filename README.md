@@ -5,7 +5,7 @@ basé sur un LLM qui tourne en local (Ollama). L'objectif est de **mesurer**
 ce que le lab détecte (couverture MITRE ATT&CK) et ce que vaut le LLM sur le
 triage (précision / rappel), pas seulement d'empiler des outils.
 
-> Statut : **semaine 3 terminée** — chaîne Sysmon → Wazuh testée, un angle mort corrigé, bruit réglé, lab sur SSD (voir [compte rendu](docs/semaine-03.md) et [CHANGELOG](CHANGELOG.md)) · prochaine étape : Suricata → Wazuh (S4)
+> Statut : **semaine 4 en cours** — Suricata en écoute sur le lab (règles ET Open), bruit `STREAM` éteint, gravité des alertes alignée sur Emerging Threats, conteneur attaquant prêt (voir [compte rendu](docs/semaine-04.md) et [CHANGELOG](CHANGELOG.md)) · reste : lignes réseau (scan, brute force) de la matrice de visibilité, en S5-S6
 
 ## Architecture
 
@@ -44,7 +44,7 @@ flowchart LR
 |---|---|---|---|
 | S1 | Snapshot, dépôt, réseau lab, VM Windows | Dépôt + schéma | ✅ terminé |
 | S2–S3 | Domaine AD, Sysmon, agents Wazuh, validation de la chaîne de détection | Captures d'alertes Sysmon + config versionnée | ✅ terminé |
-| S4 | Suricata (ET Open) → Wazuh | Tableau « attaque → détecté par quoi » | ⬜ |
+| S4 | Suricata (ET Open) → Wazuh | Matrice de visibilité « activité → détecté par quoi » (poste + réseau) | 🟦 en cours |
 | S5–S6 | Atomic Red Team + Kerberoasting | Matrice de couverture ATT&CK + angles morts | ⬜ |
 | S7–S8 | Évaluation du pipeline LLM | Précision / rappel / FP + limites et sécurité | ⬜ |
 
@@ -69,6 +69,30 @@ Règle : si une phase déborde, on supprime la suivante plutôt que de bâcler.
 ```
 
 ## Résultats
+
+### Semaine 4 — détection réseau (Suricata) ajoutée à la chaîne
+
+Suricata, hérité de la S2 où il capturait le LAN domestique, a été reconfiguré
+pour le lab et branché sur Wazuh ([détail](docs/semaine-04.md)) :
+
+| Mesure | Résultat |
+|---|---|
+| Bruit `SURICATA STREAM` | ~22 000 alertes/jour (S2) → **1 en 2 jours** |
+| Chaîne trafic → Suricata → Wazuh | validée en ~5 s |
+| Perte de paquets à la capture | 0 (0,00 %) sur 236 469 paquets |
+| Gravité des alertes | alignée sur Emerging Threats (règles 100200-100202, niveaux 7/10/12) au lieu d'un niveau 3 uniforme |
+
+Points clés :
+
+- **Mode hub** (`bridge-ageing 0` sur `vmbr1`) : la VM Wazuh voit tout le trafic
+  est-ouest du lab, équivalent virtuel du port mirroring / TAP du monde physique
+  ([section 1](docs/semaine-04.md#1-état-initial-et-mode-hub)).
+- **Deux points d'observation** : poste (Sysmon) et réseau (Suricata) se
+  complètent sans se recouvrir — d'où la matrice de visibilité
+  ([section 7](docs/semaine-04.md#7-matrice-de-visibilité--activité--détecté-par-quoi)).
+- **Réglages de capture** : GRO/GSO/TSO coupés (cause du bruit `STREAM`) et
+  `tpacket-v3` activé, par un drop-in systemd et `suricata.yaml` versionnés.
+- **Conteneur `attacker`** (LXC, 512 Mo) prêt pour les tests réseau des S5-S6.
 
 ### Semaine 3 — premier test de la chaîne de détection
 
