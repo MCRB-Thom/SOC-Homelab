@@ -4,7 +4,7 @@ Format : une entrée par session de travail, la plus récente en haut.
 Chaque entrée indique ce qui a changé dans le lab, pourquoi, et la preuve
 (`docs/preuves/`, `docs/screenshots/`).
 
-## 2026-10-18 → 25 — Semaine 4 (en cours) : Suricata sur le lab, conteneur attaquant, gravité des alertes
+## 2026-10-18 → 25 — Semaine 4 : Suricata sur le lab, conteneur attaquant, gravité des alertes
 
 ### Fait
 - Mode hub de `vmbr1` vérifié : la VM Wazuh voit le trafic `ws01` ↔ `dc01`, réponses ARP unicast comprises, 0 paquet perdu (`docs/preuves/s04/s04-01-etat-initial.txt`).

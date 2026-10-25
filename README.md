@@ -5,7 +5,7 @@ basé sur un LLM qui tourne en local (Ollama). L'objectif est de **mesurer**
 ce que le lab détecte (couverture MITRE ATT&CK) et ce que vaut le LLM sur le
 triage (précision / rappel), pas seulement d'empiler des outils.
 
-> Statut : **semaine 4 en cours** — Suricata en écoute sur le lab (règles ET Open), bruit `STREAM` éteint, gravité des alertes alignée sur Emerging Threats, conteneur attaquant prêt (voir [compte rendu](docs/semaine-04.md) et [CHANGELOG](CHANGELOG.md)) · reste : lignes réseau (scan, brute force) de la matrice de visibilité, en S5-S6
+> Statut : **semaine 4 terminée** — Suricata en écoute sur le lab (règles ET Open), bruit `STREAM` éteint, gravité des alertes alignée sur Emerging Threats, conteneur attaquant prêt (voir [compte rendu](docs/semaine-04.md) et [CHANGELOG](CHANGELOG.md)) · prochaine étape : tests offensifs depuis `attacker` et matrice de couverture ATT&CK (S5-S6)
 
 ## Architecture
 
@@ -44,7 +44,7 @@ flowchart LR
 |---|---|---|---|
 | S1 | Snapshot, dépôt, réseau lab, VM Windows | Dépôt + schéma | ✅ terminé |
 | S2–S3 | Domaine AD, Sysmon, agents Wazuh, validation de la chaîne de détection | Captures d'alertes Sysmon + config versionnée | ✅ terminé |
-| S4 | Suricata (ET Open) → Wazuh | Matrice de visibilité « activité → détecté par quoi » (poste + réseau) | 🟦 en cours |
+| S4 | Suricata (ET Open) → Wazuh | Matrice de visibilité « activité → détecté par quoi » (poste + réseau) | ✅ terminé |
 | S5–S6 | Atomic Red Team + Kerberoasting | Matrice de couverture ATT&CK + angles morts | ⬜ |
 | S7–S8 | Évaluation du pipeline LLM | Précision / rappel / FP + limites et sécurité | ⬜ |
 

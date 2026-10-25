@@ -1,7 +1,8 @@
 # Semaine 4 — Suricata sur le lab, conteneur attaquant, gravité des alertes (18 → 20 oct. 2026)
 
-> Statut : **en cours**. La matrice de visibilité (section 7) pose le cadre ;
-> ses lignes réseau « à mesurer » se rempliront en S5-S6 avec le conteneur attaquant.
+> Statut : **terminée**. La matrice de visibilité (section 7) pose le cadre ;
+> ses lignes réseau « à mesurer » relèvent des tests offensifs de la S5-S6
+> (conteneur attaquant), conformément à la feuille de route.
 
 **Objectif** : ajouter la détection réseau (Suricata, règles ET Open) à la chaîne
 Wazuh, sur le trafic du lab, et préparer une machine attaquante pour les tests.
