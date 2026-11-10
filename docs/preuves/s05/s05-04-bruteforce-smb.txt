@@ -1,0 +1,36 @@
+# 2026-11-10 — force brute SMB depuis attacker (130) sur j.martin @ dc01 (10.10.10.20)
+# Hydra écarté : son module SMB parle SMBv1, refusé par le DC ("invalid reply from target").
+# Outil retenu : boucle smbclient (SMBv2/3). Liste = 5 mauvais mots de passe + le vrai en 6e position.
+# pct exec 130 -- sh -c 'while read p; do smbclient -L //10.10.10.20 -U "soclab\j.martin%$p" -g ... done < /tmp/mdp.txt'
+[-] echec    x5
+[+] TROUVE   (6e essai — mot de passe réel, non reproduit ici)
+
+# POINT 1 — dc01, journal Security (visibilité)
+# Get-WinEvent Security Id=4625,4624 (10 min) | ? j.martin | group Id
+Name Count
+---- -----
+4624     1      <- 1 connexion réussie
+4625     5      <- 5 échecs
+
+# POINT 2 — Wazuh (détection)
+# grep -iE 'j.martin|logon|brute' alerts.json | "description" | sort | uniq -c
+      5 "Logon Failure - Unknown user or bad password"   <- règle 60122, niveau 5, une par échec
+      2 "Successful Remote Logon ... NTLM ... possible pass-the-hash" <- nos RDP admin (faux positif, à part)
+    (aucune alerte de corrélation "Multiple Windows Logon Failures")
+
+# CONSTAT :
+# - Visibilité : totale côté DC (5x 4625 + 1x 4624).
+# - Détection Wazuh : partielle. Échecs tracés au niveau 5, mais la corrélation force brute
+#   (règle 60204 "Multiple Windows Logon Failures", niveau 10) exige >= 8 échecs rapprochés.
+#   5 tentatives restent sous le seuil => pas d'alerte agrégée.
+# - Angle mort : une force brute courte, ou étalée dans le temps, échappe à la corrélation par défaut.
+# Étape suivante : rejouer avec >= 8 échecs pour confirmer le déclenchement de 60204 (mécanisme du seuil).
+
+# --- Confirmation du seuil (second passage, 10 mauvais mots de passe) ---
+# pct exec 130 : boucle smbclient sur /tmp/mdp2.txt (10 échecs) -> 10x "[-] echec"
+# grep -iE 'multiple.*logon|brute|logon failures' alerts.json :
+      1 "level":10,"description":"Multiple Windows Logon Failures"
+      1 "id":"60204"
+# => 5 échecs : aucune corrélation. 10 échecs : règle 60204 (niveau 10) déclenchée.
+#    Le seuil natif de corrélation force brute est de 8 échecs rapprochés.
+# Nettoyage prévu : rm /tmp/mdp.txt /tmp/mdp2.txt sur le conteneur attaquant (mots de passe en clair).

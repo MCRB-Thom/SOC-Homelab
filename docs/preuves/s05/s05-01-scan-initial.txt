@@ -1,0 +1,5 @@
+# 2026-11 — Rappel : le test de balayage de ports initial (avant règle locale) a été réalisé sur le
+# poste précédent et sa trace n'a pas été conservée lors du changement de machine.
+# Conclusion de ce test (reprise dans s05-02/03) : ET Open ne détecte pas le balayage lui-même ;
+# seule la sonde RDP de nmap (ET 2036252, niveau 7) remontait, car le port 3389 était ouvert.
+# Le re-test après déploiement de la règle locale est documenté dans s05-03-retest-scan.txt.
