@@ -44,3 +44,9 @@ Nommage : `sNN-<sujet>.png`.
 | `s04-wazuh-suricata-24h.png` | Alertes Suricata dans Wazuh sur 24 h : une seule (le test `uid=0(root)`), plus de bruit `SURICATA STREAM` ; rattachée à l'agent `WAZUH` (la sonde), pas à `ws01` |
 | `s04-wazuh-suricata-detail-1.png` | Détail de l'alerte 2100498 : `alert.severity` 2 (classe « Potentially Bad Traffic ») mais `signature_severity` ET « Informational » |
 | `s04-wazuh-suricata-detail-2.png` | Suite : capture sur `enp6s19`, httpbin (44.210.74.85:80) → `ws01`, ramenée par Wazuh à la règle 86601 niveau 3 |
+
+## Semaine 5
+
+| Fichier | Contenu |
+|---|---|
+| `s05-wazuh-scan-niveau10.png` | Règle 100201 sur 24 h : une seule alerte de niveau 10 pour le balayage nmap `attacker` (10.10.10.66) → `ws01` (10.10.10.30), levée par la règle Suricata locale sid 1000001 |
