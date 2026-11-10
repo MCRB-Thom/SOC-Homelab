@@ -1,0 +1,14 @@
+# 2026-11-10 — re-test du balayage de ports après déploiement de la règle locale sid 1000001
+# (hôte Proxmox) pct exec 130 -- nmap -sS -Pn --top-ports 100 10.10.10.30     (attacker -> ws01)
+
+# (VM Wazuh) grep 'SOCLAB SCAN' /var/ossec/logs/alerts/alerts.json | grep -oE '"timestamp"|"rule":{level,description,id}|"src_ip"|"dest_ip"' | paste - - - - | tail -3
+"timestamp":"2026-11-10T21:52:01.224+0100"      "rule":{"level":10,"description":"Suricata (ET Major) : SOCLAB SCAN Balayage de ports TCP (nombreux SYN d'une meme source) - 10.10.10.66 -> 10.10.10.30","id":"100201"  "timestamp":"2026-11-10T21:51:59.774982+0100"   "src_ip":"10.10.10.66"
+"dest_ip":"10.10.10.30" "src_ip":"10.10.10.66"  "dest_ip":"10.10.10.30"
+
+# Résultat :
+# - Scan DÉTECTÉ : une seule alerte pour ~100 SYN (threshold "both" : au plus une alerte par source et par minute).
+# - Niveau 10 via la règle Wazuh 100201 (lecture de signature_severity Major), source attacker 10.10.10.66,
+#   cible ws01 10.10.10.30.
+# - Délai : paquet vu par Suricata à 21:51:59.775, alerte Wazuh à 21:52:01.224, soit ~1,5 s.
+# Avant la règle (test S5 initial) : seule la sonde RDP de nmap (ET 2036252, niveau 7) était remontée, et
+# uniquement parce que le port 3389 était ouvert ; le balayage lui-même n'était pas détecté.

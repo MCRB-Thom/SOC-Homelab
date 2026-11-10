@@ -1,0 +1,21 @@
+# Règles Suricata locales du SOC-Homelab.
+# Déployées sur la VM Wazuh : /etc/suricata/rules/local.rules
+# Référencées dans /etc/suricata/suricata.yaml (section rule-files).
+# Plage de SID réservée aux règles locales : 1000000-1999999.
+
+# S5 : détection d'un balayage de ports TCP (motif "une source, beaucoup de SYN
+# en peu de temps"). ET Open ne détecte pas nativement un scan de ports ; lors du
+# test S5, seule la sonde RDP de nmap (2036252) avait été vue, et seulement parce
+# que RDP était ouvert. Cette règle attrape le motif lui-même.
+#
+#   flow:to_server; flags:S;  -> paquets SYN du client (connexions initiées),
+#                                hors SYN-ACK (réponses, sens to_client).
+#   threshold:type both,track by_src,count 30,seconds 60
+#                             -> déclenche au 30e SYN d'une même source en 60 s,
+#                                puis au plus une alerte par source et par minute.
+#   metadata:signature_severity Major
+#                             -> repris par la règle Wazuh 100201 : niveau 10.
+#
+# Seuil 30/60 s : largement dépassé par un scan nmap (≈ 1 par port), rarement
+# atteint par une machine normale dans ce lab calme. À ajuster si faux positifs.
+alert tcp any any -> $HOME_NET any (msg:"SOCLAB SCAN Balayage de ports TCP (nombreux SYN d'une meme source)"; flow:to_server; flags:S; threshold:type both,track by_src,count 30,seconds 60; classtype:attempted-recon; target:dest_ip; metadata:signature_severity Major; sid:1000001; rev:1;)

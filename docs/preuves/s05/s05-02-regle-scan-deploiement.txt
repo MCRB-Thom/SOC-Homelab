@@ -1,0 +1,29 @@
+# 2026-11-10 — VM Wazuh (109) — déploiement de la règle Suricata locale de détection de scan (sid 1000001)
+# Fichier : /etc/suricata/rules/local.rules  (copie versionnée : configs/suricata/local.rules)
+# Placé hors de /var/lib/suricata/rules (default-rule-path), dossier réécrit par suricata-update.
+
+# Contrôle d'intégrité par rapport au dépôt
+# echo "50e3a3f7...340b1  /etc/suricata/rules/local.rules" | sha256sum -c
+/etc/suricata/rules/local.rules: Réussi
+
+# Section rule-files avant modification
+2187:default-rule-path: /var/lib/suricata/rules
+2189:rule-files:
+2190:  - suricata.rules
+
+# Ajout (après sauvegarde suricata.yaml.bak-2026-11-10) :
+# sed -i '2190a\  - /etc/suricata/rules/local.rules' /etc/suricata/suricata.yaml
+rule-files:
+  - suricata.rules
+  - /etc/suricata/rules/local.rules
+
+# Validation à blanc : suricata -T -c /etc/suricata/suricata.yaml -v
+Info: detect: 2 rule files processed. 53196 rules successfully loaded, 0 rules failed, 0
+Info: detect: 53201 signatures processed. 1210 are IP-only rules, 4548 are inspecting packet payload, 47207 inspect application layer, 109 are decoder event only
+Notice: suricata: Configuration provided was successfully loaded. Exiting.
+
+# Redémarrage : systemctl restart suricata; systemctl is-active suricata; grep suricata.log
+active
+[3526 - Suricata-Main] 2026-11-10 21:49:13 Info: detect: 2 rule files processed. 53196 rules successfully loaded, 0 rules failed, 0
+
+# => règle locale chargée avec les règles ET Open, aucune règle en échec, sonde active.
