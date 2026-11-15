@@ -5,7 +5,7 @@ basé sur un LLM qui tourne en local (Ollama). L'objectif est de **mesurer**
 ce que le lab détecte (couverture MITRE ATT&CK) et ce que vaut le LLM sur le
 triage (précision / rappel), pas seulement d'empiler des outils.
 
-> Statut : **semaine 4 terminée** — Suricata en écoute sur le lab (règles ET Open), bruit `STREAM` éteint, gravité des alertes alignée sur Emerging Threats, conteneur attaquant prêt (voir [compte rendu](docs/semaine-04.md) et [CHANGELOG](CHANGELOG.md)) · prochaine étape : tests offensifs depuis `attacker` et matrice de couverture ATT&CK (S5-S6)
+> Statut : **semaine 5 en cours** — trois techniques ATT&CK jouées depuis `attacker` (balayage de ports, force brute SMB, Kerberoasting) et mesurées côté poste et réseau ; première [matrice de couverture ATT&CK](docs/semaine-05.md#4-matrice-de-couverture-attck) avec ses angles morts (voir [compte rendu](docs/semaine-05.md) et [CHANGELOG](CHANGELOG.md)) · prochaine étape : Atomic Red Team sur `ws01` et effet de Defender (S6)
 
 ## Architecture
 
@@ -45,7 +45,7 @@ flowchart LR
 | S1 | Snapshot, dépôt, réseau lab, VM Windows | Dépôt + schéma | ✅ terminé |
 | S2–S3 | Domaine AD, Sysmon, agents Wazuh, validation de la chaîne de détection | Captures d'alertes Sysmon + config versionnée | ✅ terminé |
 | S4 | Suricata (ET Open) → Wazuh | Matrice de visibilité « activité → détecté par quoi » (poste + réseau) | ✅ terminé |
-| S5–S6 | Atomic Red Team + Kerberoasting | Matrice de couverture ATT&CK + angles morts | ⬜ |
+| S5–S6 | Atomic Red Team + Kerberoasting | Matrice de couverture ATT&CK + angles morts | 🔄 en cours |
 | S7–S8 | Évaluation du pipeline LLM | Précision / rappel / FP + limites et sécurité | ⬜ |
 
 Règle : si une phase déborde, on supprime la suivante plutôt que de bâcler.
@@ -69,6 +69,25 @@ Règle : si une phase déborde, on supprime la suivante plutôt que de bâcler.
 ```
 
 ## Résultats
+
+### Semaine 5 — tests offensifs et couverture ATT&CK (en cours)
+
+Trois techniques jouées depuis `attacker` contre le domaine, mesurées côté poste
+(Sysmon / journaux Windows) et côté réseau (Suricata), pour séparer *visibilité*
+et *détection* ([détail](docs/semaine-05.md),
+[matrice](docs/semaine-05.md#4-matrice-de-couverture-attck)) :
+
+| Technique ATT&CK | Visible | Détecté par Wazuh | Angle mort |
+|---|---|---|---|
+| T1046 Balayage de ports | réseau | ✅ niveau 10, après **règle Suricata locale** (ET Open ne couvre pas le scan SYN) | scan lent sous le seuil |
+| T1110 Force brute SMB | poste (DC : 4625/4624) | ⚠️ corrélation niveau 10 seulement à **≥ 8 échecs** | force brute courte ou étalée |
+| T1558.003 Kerberoasting | poste (4769 RC4) **et** réseau | ⚠️ **réseau seul** (Suricata niveau 3) ; rien côté poste | 4769 non relevé par défaut |
+
+Enseignement : **voir n'est pas détecter**. Les trois attaques laissent une
+trace, mais seule celle pour laquelle une règle locale a été écrite produit
+d'emblée une alerte de niveau élevé ; les deux autres dépendent d'un seuil de
+corrélation ou d'une sonde réseau à bas niveau. Poste et réseau se complètent
+sans se recouvrir — le Kerberoasting n'est *détecté* que par le réseau.
 
 ### Semaine 4 — détection réseau (Suricata) ajoutée à la chaîne
 

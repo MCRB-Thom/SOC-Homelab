@@ -50,3 +50,4 @@ Nommage : `sNN-<sujet>.png`.
 | Fichier | Contenu |
 |---|---|
 | `s05-wazuh-scan-niveau10.png` | Règle 100201 sur 24 h : une seule alerte de niveau 10 pour le balayage nmap `attacker` (10.10.10.66) → `ws01` (10.10.10.30), levée par la règle Suricata locale sid 1000001 |
+| `s05-wazuh-kerberoasting-suricata.png` | Règle 86601 : alerte Suricata « Kerberos 5 weak encryption parameters » (niveau 3) sur le ticket RC4 du Kerberoasting de `svc_sql`, `dc01` (10.10.10.20) → `attacker` (10.10.10.66), à 18:09 — seule détection côté SIEM, l'événement 4769 du DC n'étant pas relevé par Wazuh |

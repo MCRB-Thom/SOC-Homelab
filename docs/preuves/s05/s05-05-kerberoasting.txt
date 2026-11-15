@@ -1,0 +1,49 @@
+# 2026-11-14 — Kerberoasting (T1558.003) depuis attacker (130) contre svc_sql @ dc01
+# Cible : compte de service svc_sql, SPN MSSQL/sql01.soclab.internal:1433, créé en S5.
+# Identifiants utilises : j.martin (utilisateur standard du domaine, le compte "compromis").
+# Outil : Impacket GetUserSPNs (v0.10.0), mot de passe saisi au prompt (jamais en ligne de commande).
+
+# COMMANDE
+# python3 .../examples/GetUserSPNs.py -dc-ip 10.10.10.20 -request-user svc_sql 'soclab.internal/j.martin'
+
+# SORTIE
+ServicePrincipalName              Name     MemberOf  PasswordLastSet             LastLogon  Delegation
+--------------------------------  -------  --------  --------------------------  ---------  ----------
+MSSQL/sql01.soclab.internal:1433  svc_sql            2026-11-14 15:35:07.794120  <never>
+
+$krb5tgs$23$*svc_sql$SOCLAB.INTERNAL$soclab.internal/svc_sql*$73f6f902...<hash tronque : RC4 crackable hors ligne, non reproduit>
+
+# LECTURE DU HASH
+# $krb5tgs$23$ : le "23" = type de chiffrement RC4-HMAC (etype 0x17). L'attaquant demande
+#   volontairement du RC4 car il se casse hors ligne (hashcat -m 13100) bien plus vite qu'AES.
+# Un simple utilisateur du domaine (j.martin) peut demander le ticket de service de n'importe
+#   quel compte porteur d'un SPN : c'est le principe du Kerberoasting. Aucune elevation requise.
+
+# --- DEFENSE ---
+
+# POINT 1 — dc01, journal Security (visibilite endpoint)
+# Get-WinEvent Security Id=4769 (40 derniers) | ? svc_sql
+Heure               Service Chiffrement
+14/11/2026 18:09:21 svc_sql 0x17 (RC4 - Kerberoasting)
+# => 1 seul 4769 pour svc_sql, en RC4. Visibilite totale cote DC.
+
+# POINT 2 — Wazuh (detection)
+# grep svc_sql|4769|kerberos alerts.json -> aucune alerte sur le 4769.
+#   Le ruleset Wazuh par defaut ne releve pas l'event 4769 (trop frequent en trafic legitime),
+#   donc la demande de ticket RC4 ne declenche AUCUNE alerte cote endpoint. ANGLE MORT.
+# En revanche, la sonde reseau l'attrape :
+#   86601 niv 3 | Suricata: Alert - SURICATA Kerberos 5 weak encryption parameters  (x2)
+# grep '"id":"86601"' alerts.json :
+2026-11-14T18:09:25 10.10.10.20 -> 10.10.10.66 | SURICATA Kerberos 5 weak encryption parameters
+2026-11-14T18:09:25 10.10.10.20 -> 10.10.10.66 | SURICATA Kerberos 5 weak encryption parameters
+#   Sens DC -> attacker : la reponse du KDC (TGS-REP) porte le ticket chiffre en RC4.
+#   2 hits coherents avec l'echange, horodatage aligne sur le 4769 (18:09).
+
+# CONSTAT (ligne de matrice) :
+# - Visibilite : totale. DC (4769 RC4) ET reseau (Suricata) voient l'attaque.
+# - Detection endpoint (Wazuh / Security) : NULLE. Pas de regle sur le 4769 par defaut.
+# - Detection reseau (Suricata) : OUI, mais niveau 3 seulement (regle 86601).
+#   Le RC4 Kerberos est anormal dans ce lab (Server 2022 + Win11 negocient AES) : c'est ce
+#   contraste qui fait le signal. Sur un vrai parc avec de vieux clients RC4, le signal se noie.
+# - Amelioration possible : regle Wazuh locale sur le 4769 avec etype 0x17 ciblant les comptes
+#   de service (SPN), pour remonter le signal cote endpoint et correler avec Suricata.

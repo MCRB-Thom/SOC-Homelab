@@ -4,6 +4,25 @@ Format : une entrée par session de travail, la plus récente en haut.
 Chaque entrée indique ce qui a changé dans le lab, pourquoi, et la preuve
 (`docs/preuves/`, `docs/screenshots/`).
 
+## 2026-11-10 → 14 — Semaine 5 : tests offensifs depuis `attacker` et couverture ATT&CK
+
+### Fait
+- Balayage de ports (T1046) depuis `attacker` : ET Open ne détecte pas le scan SYN lui-même (seule la sonde RDP 2036252 niveau 7 remontait). Règle Suricata locale `sid:1000001` ajoutée (`flags:S`, `threshold both` 30 SYN / 60 s, `signature_severity Major`), déposée dans `/etc/suricata/rules/local.rules` hors du dossier réécrit par `suricata-update`, versionnée et vérifiée par SHA-256 (`configs/suricata/local.rules`, `docs/preuves/s05/s05-02`).
+- Re-test du balayage : ~100 SYN → une seule alerte (`threshold both`), niveau 10 via la règle Wazuh 100201, `10.10.10.66 → 10.10.10.30`, délai ~1,5 s (`s05-03`, `screenshots/s05-wazuh-scan-niveau10.png`).
+- Force brute SMB (T1110) sur `j.martin` : `hydra` écarté (module SMB en SMBv1, refusé par le DC), remplacé par une boucle `smbclient` (SMBv2/3). DC : 5 × 4625 + 1 × 4624. Wazuh : 60122 niveau 5 par échec, corrélation 60204 niveau 10 seulement à ≥ 8 échecs (vérifié : 5 échecs → rien, 10 échecs → 1 alerte) (`s05-04`).
+- Kerberoasting (T1558.003) : compte de service `svc_sql` (SPN `MSSQL/sql01.soclab.internal:1433`). Impacket `GetUserSPNs` avec les identifiants de `j.martin` → hash `$krb5tgs$23$` (RC4). DC : 1 × événement 4769 `Ticket Encryption Type 0x17`. Wazuh : aucune alerte côté poste (4769 non relevé par défaut), seule la sonde Suricata remonte (86601 niveau 3, « Kerberos 5 weak encryption parameters », `10.10.10.20 → 10.10.10.66`, horodatage aligné) (`s05-05`, `screenshots/s05-wazuh-kerberoasting-suricata.png`).
+- Compte rendu `docs/semaine-05.md` avec la **matrice de couverture ATT&CK** (visibilité poste/réseau, détection Wazuh, angle mort par technique) ; README et feuille de route mis à jour (phase S5-S6 en cours).
+
+### Constat
+- **Voir n'est pas détecter** : les trois attaques laissent une trace exploitable, une seule (le balayage, après règle locale) produit d'emblée une alerte de niveau élevé.
+- Poste et réseau se complètent sans se recouvrir : la force brute n'est visible qu'au DC, le Kerberoasting n'est *détecté* qu'au réseau.
+- Angles morts documentés : scan lent sous le seuil ; force brute courte ou étalée sous la corrélation (seuil 8) ; 4769 RC4 non relevé côté endpoint, et signal réseau qui se noierait sur un parc avec de vieux clients RC4.
+- Hygiène : hashes Kerberos tronqués dans les preuves (cassables hors ligne) ; listes de mots de passe de test en clair sur `attacker` supprimées après usage, jamais versionnées.
+
+### Reste à faire
+- Atomic Red Team sur `ws01` (Defense Evasion, Persistence) et mesure de l'effet de Defender (S6).
+- Prototype de règle Wazuh endpoint pour le Kerberoasting (4769 + etype `0x17` sur comptes à SPN), pour combler l'angle mort côté poste.
+
 ## 2026-10-18 → 25 — Semaine 4 : Suricata sur le lab, conteneur attaquant, gravité des alertes
 
 ### Fait
